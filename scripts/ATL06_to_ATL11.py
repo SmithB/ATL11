@@ -53,6 +53,7 @@ def main(argv):
     parser.add_argument('--test_plot', action='store_true', help="plots locations, elevations, and elevation differences between cycles")
     parser.add_argument('--Blacklist','-B', action='store_true')
     parser.add_argument('--verbose','-v', action='store_true')
+    parser.add_argument('--log_file', type=str, help='write detailed logging information to this file')
     args=parser.parse_args()
 
     # output file format is ATL11_RgtSubprod_c1c2_rel_vVer.h5
@@ -79,6 +80,9 @@ def main(argv):
     else:
         GI_files=None   
     print("found GI files:"+str(GI_files))
+    
+    if args.log_file is not None:
+        logs={}
     
     for pair in pairs:
         D6 = ATL11.read_ATL06_data(files, beam_pair=pair, cycles=args.cycles, use_blacklist=args.Blacklist)
@@ -110,12 +114,17 @@ def main(argv):
         
         if D11 is not None:
             D11.write_to_file(out_file)
-
+        if args.log_file is not None:
+            logs[pair]=D11.logs
 #    out_file = ATL11.write_METADATA.write_METADATA(out_file,files)
     out_file = ATL11.write_METADATA(out_file,files)
-
+    
+    if args.log_file is not None:
+        import json
+        with open(args.log_file,'w') as fh_out:
+            fh_out.write(json.dumps(logs))
     print("ATL06_to_ATL11: done with "+out_file)
-        
+    
     if args.test_plot:
         ATL11.ATL11_test_plot.ATL11_test_plot(out_file)
 #        ATL11.ATL11_browse_plots.ATL11_browse_plots(out_file,args.Hemispher,mosaic=mosaic)
