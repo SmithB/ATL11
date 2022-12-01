@@ -57,6 +57,7 @@ class point(ATL11.data):
         self.ref_surf.rgt_azimuth=track_azimuth
         self.ref_surf.fit_quality=0
         self.ref_surf.complex_surface_flag=False
+        self.log={}
 
     def from_data(self, D11, ind):
         """
@@ -501,6 +502,7 @@ class point(ATL11.data):
                 return
             if P>0.025:
                 break
+        self.log['ref_surf_iteration']=iteration
         if (n_rows-n_cols)>0:
             self.ref_surf.misfit_chi2r=misfit_chi2/(n_rows-n_cols)
         else:
