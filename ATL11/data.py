@@ -669,6 +669,8 @@ class data(object):
             if GI_files is not None and np.abs(P11.ROOT.latitude) < max_xover_latitude:
                 D_xover=ATL11.get_xover_data(x0, y0, P11.rgt, GI_files, \
                                              D_xover_cache, index_bin_size, params_11)
+                P11.log['xover_cache_bins']=len(D_xover_cache.keys())
+                P11.log['N_xover_cache_data']=np.sum([ii['D'].size for ii in D_xover_cache.values()])
                 P11.corr_xover_heights(D_xover)
             # if we have read any data for the current bin, run the crossover calculation
             PLOTME=False
