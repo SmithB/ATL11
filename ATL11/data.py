@@ -143,9 +143,11 @@ class data(object):
                         setattr(getattr(self, group), field, np.concatenate(temp_out).ravel())
                     except ValueError:
                         print("Problem writing %s" %field)
-
+        
         self.slope_change_t0=P11_list[0].slope_change_t0
-
+        self.log={}
+        for P11 in P11_list:
+            self.log[P11.ref_pt]=P11.log
         return self
 
     def from_file(self,  filename, pair=2, index_range=[0, -1], field_dict=None, invalid_to_nan=True):
