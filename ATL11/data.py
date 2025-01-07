@@ -638,7 +638,7 @@ class data(object):
                 continue
 
             #2a. define representative x and y values for the pairs
-            pair_data=ATL06_pair().from_ATL06(D6_sub, datasets=['x_atc','y_atc','delta_time','dh_fit_dx','dh_fit_dy','segment_id','cycle_number','h_li', 'h_li_sigma'])   # this might go, similar to D6_sub
+            pair_data=ATL06_pair(D6_sub)
             if ~np.any(np.isfinite(pair_data.y)):
                 continue
             P11=ATL11.point(N_pairs=len(pair_data.x), rgt=D6_sub.rgt[0, 0],\
