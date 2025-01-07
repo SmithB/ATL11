@@ -303,8 +303,8 @@ class data(object):
             self.x=np.reshape(x, lat.shape)
             self.y=np.reshape(y, lon.shape)
             bad=~np.isfinite(x)
-            self.x[bad]=np.NaN
-            self.y[bad]=np.NaN
+            self.x[bad]=np.nan
+            self.y[bad]=np.nan
         return self
 
     def write_to_file(self, fileout, params_11=None):
@@ -556,8 +556,8 @@ class data(object):
             zz=self.ROOT.h_corr[:,cycle]
             ss=self.ROOT.h_corr_sigma[:,cycle]
             good=np.abs(ss)<15
-            ss[~good]=np.NaN
-            zz[~good]=np.NaN
+            ss[~good]=np.nan
+            zz[~good]=np.nan
             if np.any(good):
                 h0=plt.errorbar(xx[good],zz[good],ss[good], marker='o',picker=5)
                 h.append(h0)
@@ -792,7 +792,7 @@ def regress_to(D, out_field_names, in_field_names, in_field_pt, DEBUG=None):
     good_rows=np.all(~np.isnan( np.concatenate( (D_in,D_out), axis=1)), axis=1)
 
     if np.sum(good_rows) < 2:
-        return np.zeros(len(out_field_names))+np.NaN
+        return np.zeros(len(out_field_names))+np.nan
 
     # build the regression matrix
     G=np.ones((np.sum(good_rows),len(in_field_names)+1) )

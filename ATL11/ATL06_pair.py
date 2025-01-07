@@ -30,7 +30,7 @@ class ATL06_pair:
         else:
             #initializes an empty structure
             for field in ('x','y','dh_dx','dh_dy','delta_time','segment_id','cycle','h','valid'):
-                setattr(self, field, np.NaN)
+                setattr(self, field, np.nan)
 
     def __getitem__(self, key):
         temp06=ATL06_pair()

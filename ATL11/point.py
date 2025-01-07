@@ -16,7 +16,7 @@ import ATL11
 
 class point(ATL11.data):
     # ATL11_point is a class with methods for calculating ATL11 from ATL06 data
-    def __init__(self, N_pairs=1, ref_pt=None, beam_pair=None, x_atc_ctr=np.NaN,  track_azimuth=np.NaN,
+    def __init__(self, N_pairs=1, ref_pt=None, beam_pair=None, x_atc_ctr=np.nan,  track_azimuth=np.nan,
                  max_poly_degree=[1, 1], cycles=[1,12],  rgt=None, mission_time_bds=None, params_11=None, use_release_bias=False):
         # input variables:
         # N_pairs: Number of distinct pairs in the ATL06 data
@@ -42,8 +42,8 @@ class point(ATL11.data):
         self.beam_pair=beam_pair
         self.ref_pt=ref_pt
         self.track_azimuth=track_azimuth
-        self.ref_surf_slope_x=np.NaN
-        self.ref_surf_slope_y=np.NaN
+        self.ref_surf_slope_x=np.nan
+        self.ref_surf_slope_y=np.nan
         self.rgt=rgt
         if mission_time_bds is None:
             #Under normal circumstances, mission_time_bounds is set by data.py
@@ -511,7 +511,7 @@ class point(ATL11.data):
         if (n_rows-n_cols)>0:
             self.ref_surf.misfit_chi2r=misfit_chi2/(n_rows-n_cols)
         else:
-            self.ref_surf.misfit_chi2r=np.NaN
+            self.ref_surf.misfit_chi2r=np.nan
 
         # identify the ref_surf cycles that survived the fit
         self.ref_surf_cycles=self.ref_surf_cycles[fit_columns[TOC['zp']]]
@@ -560,7 +560,7 @@ class point(ATL11.data):
 
         # write out the zp
         zp_nan_mask=np.ones_like(TOC_out['zp'], dtype=float)
-        zp_nan_mask[m_surf_zp_sigma[TOC_out['zp']]>15]=np.NaN
+        zp_nan_mask[m_surf_zp_sigma[TOC_out['zp']]>15]=np.nan
         self.ROOT.h_corr[0,TOC_out['cycle_ind']]=m_surf_zp[TOC_out['zp']]*zp_nan_mask
 
         # get the square of h_corr_sigma_systematic, equation 12
@@ -858,7 +858,7 @@ class point(ATL11.data):
                 if len(this)==1:
                     ss_atc_diff += (Dsub.h_li[best]+Dsub.dh_fit_dx[best]*(Dsub.x_atc[best]-Dsub.x_atc[this])-Dsub.h_li[this])**2
             if ss_atc_diff==0:
-                ss_atc_diff=[np.NaN]
+                ss_atc_diff=[np.nan]
 
             # if the along-trac RSS is too large, do not report a value
             if np.sqrt(ss_atc_diff[0]) > 10:
