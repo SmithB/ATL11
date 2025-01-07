@@ -16,7 +16,7 @@ import ATL11
 import time
 import glob
 import sys
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 import resource as memresource
 import json
 from ATL11.check_ATL06_hold_list import read_hold_files
