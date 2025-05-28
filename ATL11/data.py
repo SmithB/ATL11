@@ -307,12 +307,18 @@ class data(object):
             self.y[bad]=np.nan
         return self
 
-    def write_to_file(self, fileout, params_11=None):
+    def write_to_file(self, fileout, params_11=None, write_xovers=False, cycle=None):
         # Generic code to write data from an ATL11 object to an h5 file
         # Input:
         #   fileout: filename of hdf5 filename to write
         # Optional input:
         #   parms_11: ATL11.defaults structure
+
+        if cycle is None:
+            cycles = self.cycles
+        else:
+            cycles = [cycle, cycle]
+
         beam_pair_name='/pt%d' % self.beam_pair
         beam_pair_name=beam_pair_name.encode('ASCII')
         if os.path.isfile(fileout):
@@ -338,7 +344,7 @@ class data(object):
                 continue
             if not isinstance(val,(dict,type(None))):
                 try:
-                    if param == 'ATL06_xover_field_list':
+                    if param == 'ATL06_xover_field_list' and write_xovers:
                         xover_attr=getattr(params_11, param)
                         xover_attr = [x.encode('ASCII') for x in xover_attr]
                         g.attrs[param.encode('ASCII')]=xover_attr
@@ -350,7 +356,7 @@ class data(object):
 
         # put groups, fields and associated attributes from .csv file
 
-        attrfile=str(resources.files('ATL11').joinpath('package_data/ATL11_output_attrs.csv'))
+        attrfile=os.path.join(str(resources.files('ATL11')), 'package_data', 'ATL11_output_attrs.csv')
         with open(attrfile, 'r') as attr_fh:
             reader=list(csv.DictReader(attr_fh))
         group_names=set([row['group'] for row in reader])
@@ -410,6 +416,10 @@ class data(object):
                 dset.attrs['_FillValue'.encode('ASCII')] = np.finfo(np.dtype(field_attrs[field]['datatype'].lower())).max
 
         for group in [item for item in group_names if item != 'ROOT']:
+            # skip crossing_track_data unless write_xovers is specified
+            if group == "crossing_track_data" and not write_xovers:
+                continue
+
             if hasattr(getattr(self,group),'list_of_fields'):
                 grp = g.create_group(group.encode('ASCII'))
 
@@ -484,23 +494,106 @@ class data(object):
         f.close()
         return
 
+    def write_xover_files(self, args, replace=[False]):
+        '''
+        Write crossing track data to temporary hdf5 files.
 
-    def get_xovers(self,invalid_to_nan=True):
-        rgt=self.attrs['ReferenceGroundTrack']
+        Parameters
+        ----------
+        args : dataspace
+            arguments defined by argparse.
+        replace : list, optional
+            List containing one boolean that describes whether the output files
+            should be replaced. The default is [False].
+
+        Returns
+        -------
+        None.
+
+        '''
+        ref, crossing = self.get_xovers()
+        _, d_cyc = pc.unique_by_rows(crossing.cycle_number,
+                                     return_dict=True)
+
+        for cycle, ind in d_cyc.items():
+            this_out_file="%s/ATL11_atxo_%04d%02d_%02d_%03d_%02d.h5" %( \
+                args.xover_output_dir,args.rgt, args.subproduct, int(cycle[0]), \
+                args.Release, args.Version)
+            # write crossing track data
+            temp=crossing[ind]
+            temp.assign(ref_pair = np.zeros(temp.shape, dtype=int)+int(self.pair_num))
+            temp.assign(ref_rgt = np.zeros(temp.shape, dtype=int)+int(self.track_num))
+            temp.ravel_fields()
+            temp.to_h5(this_out_file, group=f'pair_{self.pair_num}/crossing_track_data', replace=replace[0])
+            replace[0]=False
+
+            # write reference track data
+            col = np.flatnonzero(self.cycle_number==cycle)
+            if len(col)==0:
+                # if a cycle is not present in the input cycles, fill ref with NaNs (except cycle and ref_pt fields)
+                col=0
+                fill_nans = True
+            else:
+                fill_nans = False
+
+            # subset the reference track
+            try:
+                temp=ref[ind,:][:,col]  # this should be ref[ind, col] but that's not working
+            except Exception as e:
+                print(e)
+
+            if fill_nans:
+                temp.cycle_number[:]=cycle
+                for field in temp.fields:
+                    temp_f = getattr(temp, field)
+                    if field not in ['ref_pt','cycle_number']:
+                        temp_f = temp_f.astype(float)+np.nan
+                    setattr(temp, field, temp_f)
+
+            temp.ravel_fields()
+            temp.to_h5(this_out_file, group=f'pair_{self.pair_num}/reference_track_data', replace=False)
+
+
+    def get_xovers(self,invalid_to_nan=True, calc_delta=False):
+        '''
+
+
+        Parameters
+        ----------
+        invalid_to_nan : bool, optional
+            If true, invalid values will be converted to NaNs. The default is True.
+        calc_delta : bool, optional
+            If True, the differenecs between reference and crossing-track values will be
+            calculated (not fully implemented). The default is False.
+
+        Returns
+        -------
+        ref : pointCollection.data
+            data corresponding to the reference track (1 column per cycle, one row for each crossing track)
+        crossing: pointCollection.data
+            data corresponding to the crossing tracks (one row for each crossing track.
+        delta: pointColleciton.data, output only if calc_delta is True
+            Differences between crossing tracks and reference track (same shape as crossing)
+        '''
+
+
+        try:
+            rgt=self.attrs['ReferenceGroundTrack']
+        except KeyError:
+            rgt=self.track_num
         xo={'ref':{},'crossing':{},'both':{}}
         n_cycles=self.ROOT.h_corr.shape[1]
         zz=np.zeros(n_cycles)
 
-        for field in ['delta_time','h_corr','h_corr_sigma','h_corr_sigma_systematic', 'ref_pt','rgt','atl06_quality_summary','latitude','longitude','cycle_number','x_atc','y_atc','fit_quality']:
+        both_fields = ['delta_time','h_corr','h_corr_sigma','h_corr_sigma_systematic',
+                      'ref_pt','rgt','latitude','longitude',
+                      'cycle_number', 'dh_geoloc','tide_ocean','dac']
+        ref_fields = ['x_atc','y_atc','fit_quality', 'atl06_quality_summary_zero_count']
+        xo_fields = ['beam_pair', 'atl06_quality_summary','spot','segment_id', 'along_track_rss']
+        for field in both_fields+ref_fields:
             xo['ref'][field]=[]
+        for field in both_fields + xo_fields:
             xo['crossing'][field]=[]
-            #if field in  ['delta_time','h_corr','h_corr_sigma','h_corr_sigma_systematic']:
-            #    xo['ref'][field].append([])
-            #    xo['ref'][field].append([])
-        xo['crossing']['along_track_rss']=[]
-        if hasattr(self,'x'):
-            for field in ['x','y']:
-                 xo['ref'][field]=[]
 
         for i1, ref_pt in enumerate(self.crossing_track_data.ref_pt):
             i0=np.flatnonzero(self.ROOT.ref_pt==ref_pt)[0]
@@ -510,40 +603,39 @@ class data(object):
             for field in ['x_atc','y_atc']:
                 xo['ref'][field] += [getattr(self.ref_surf, field)[i0]+zz]
             xo['ref']['ref_pt'] += [self.ROOT.ref_pt[i0]+zz]
-            xo['ref']['rgt'] += [rgt+zz]
             xo['ref']['fit_quality'] += [self.ref_surf.fit_quality[i0]+zz]
-            for field in ['delta_time','h_corr','h_corr_sigma','h_corr_sigma_systematic', 'ref_pt','rgt','atl06_quality_summary', 'cycle_number', 'along_track_rss' ]:
-                xo['crossing'][field] += [getattr(self.crossing_track_data, field)[i1]+zz]
+            # set the crossing_track fields
+            for field in both_fields + xo_fields:
+                xo['crossing'][field] += [getattr(self.crossing_track_data, field)[i1]]
 
             # fill vectors for each cycle
             for field in ['delta_time', 'h_corr','h_corr_sigma','h_corr_sigma_systematic']:  # vars that are N_pts x N_cycles
                 xo['ref'][field] += [getattr(self.ROOT, field)[i0,:]]
-            xo['ref']['atl06_quality_summary'] += [self.cycle_stats.atl06_summary_zero_count[i0,:] > 0]
+            xo['ref']['atl06_quality_summary_zero_count'] += [self.cycle_stats.atl06_summary_zero_count[i0,:]]
             xo['ref']['cycle_number'] += [getattr(self.ROOT,'cycle_number')]
-            if hasattr(self, 'x'):
-                for field in ['x','y']:
-                    xo['ref'][field] += [getattr(self, field)[i0]+zz]
-
-        xo['crossing']['latitude']=xo['ref']['latitude']
-        xo['crossing']['longitude']=xo['ref']['longitude']
-        xo['crossing']['x_atc']=xo['ref']['x_atc']
-        xo['crossing']['y_atc']=xo['ref']['y_atc']
-        xo['crossing']['fit_quality'] = xo['ref']['fit_quality']
+            for field in ['dh_geoloc','tide_ocean','dac']:
+                xo['ref'][field] += [getattr(self.cycle_stats, field)[i0,:]]
         for field in xo['crossing']:
-            xo['crossing'][field]=np.concatenate(xo['crossing'][field], axis=0)
+            xo['crossing'][field]=np.array(xo['crossing'][field])
         for field in xo['ref']:
-            xo['ref'][field]=np.concatenate(xo['ref'][field], axis=0)
-        ref=pc.data().from_dict(xo['ref'])
-        crossing=pc.data().from_dict(xo['crossing'])
+            xo['ref'][field]=np.c_[xo['ref'][field]]
 
-        delta={}
-        delta['h_corr']=crossing.h_corr-ref.h_corr
-        delta['delta_time']=crossing.delta_time-ref.delta_time
-        delta['h_corr_sigma']=np.sqrt(crossing.h_corr_sigma**2+ref.h_corr_sigma**2)
-        delta['latitude']=ref.latitude.copy()
-        delta['longitude']=ref.longitude.copy()
-        delta=pc.data().from_dict(delta)
-        return ref, crossing, delta
+        ref=pc.data(columns=n_cycles).from_dict(xo['ref'])
+        crossing=pc.data().from_dict(xo['crossing'])
+        ref.assign(rgt = rgt + np.zeros(ref.shape, dtype=int))
+        ref.assign(beam_pair = self.beam_pair + np.zeros(ref.shape, dtype=int))
+
+        if calc_delta:
+            delta={}
+            delta['h_corr']=crossing.h_corr[:, None]-ref.h_corr
+            delta['delta_time']=crossing.delta_time[:, None]-ref.delta_time
+            delta['h_corr_sigma']=np.sqrt(crossing.h_corr_sigma[:, None]**2+ref.h_corr_sigma**2)
+            delta['latitude']=ref.latitude.copy()
+            delta['longitude']=ref.longitude.copy()
+            delta=pc.data().from_dict(delta)
+            return ref, crossing, delta
+        else:
+            return ref, crossing
 
     def plot(self):
         # method to plot the results.  At present, this plots corrected h AFN of x_atc

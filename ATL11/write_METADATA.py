@@ -298,6 +298,7 @@ def poly_buffered_linestring(outfile):
             try:
                 lonlat_11 += [np.c_[h5f[pair+'/longitude'], h5f[pair+'/latitude']]]
             except Exception as e:
+                print(f"write_METADATA.py: problem reading {pair} latitude/longitude data from {outfile}")
                 print(e)
 #    print('avg lat lonlat_11[0]',np.sum(lonlat_11[0][:,1])/len(lonlat_11[0]))
 #    print('min lat lonlat_11',np.min(lonlat_11[0][:,1]))

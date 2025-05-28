@@ -60,6 +60,7 @@ def main(argv):
     parser.add_argument('--release_bias_file', type=str, help="json file specifying a bias value to be added to each spot in each data relase")
     parser.add_argument('--verbose','-v', action='store_true')
     parser.add_argument('--sec_offset','-t', type=int, default=0, help="Seconds added to 00:00:00 of a rigid start date" [0])
+    parser.add_argument('--xover_output_dir', type=str, help="directory for crossover output")
     parser.add_argument('--start_date','-D', nargs='+', type=int, default=None, help="Start date, only for output metadata [YYYY DD MM]")
     args=parser.parse_args()
 
@@ -105,6 +106,7 @@ def main(argv):
     else:
         hold_list=None
 
+    replace_xover_files=[True]
     for pair in pairs:
         # read the lat, lon, segment_id data for each segment
         D6_segdata = ATL11.read_ATL06_data(files, beam_pair=pair,
@@ -196,7 +198,8 @@ def main(argv):
             D11.Nxo = D11.crossing_track_data.h_corr.shape[0]
 
         if D11 is not None:
-            D11.write_to_file(out_file)
+            D11.write_to_file(out_file, write_xovers=False)
+            D11.write_xover_files(args, replace=replace_xover_files)
 
     out_file = ATL11.write_METADATA(out_file,args.sec_offset,args.start_date,files)
 

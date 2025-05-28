@@ -405,7 +405,7 @@ class point(ATL11.data):
         # 3a. define degree_list_x and degree_list_y.  These are stored in self.default.poly_exponent_list
         degree_x = self.params_11.poly_exponent['x']
         degree_y = self.params_11.poly_exponent['y']
-        
+
         # keep only degrees > 0 and degree_x+degree_y <= max(max_x_degree, max_y_degree)
         self.poly_mask = (degree_x + degree_y) <= np.maximum(self.ref_surf.deg_x,self.ref_surf.deg_y)
         self.poly_mask &= (degree_x <= self.ref_surf.deg_x)
@@ -869,7 +869,7 @@ class point(ATL11.data):
                                                          Dsub.sigma_geo_r**2)
 
             self.crossing_track_data.rgt.append([Dsub.rgt[best]])
-            self.crossing_track_data.spot_crossing.append([Dsub.spot[best]])
+            self.crossing_track_data.spot.append([Dsub.spot[best]])
             self.crossing_track_data.cycle_number.append([Dsub.cycle_number[best]])
             self.crossing_track_data.h_corr.append([z_xover[best]])
             self.crossing_track_data.h_corr_sigma.append([z_xover_sigma[best]])
@@ -878,6 +878,8 @@ class point(ATL11.data):
             self.crossing_track_data.delta_time.append([Dsub.delta_time[best]])
             self.crossing_track_data.atl06_quality_summary.append([Dsub.atl06_quality_summary[best]])
             self.crossing_track_data.dh_geoloc.append([Dsub.dh_geoloc[best]])
+            self.crossing_track_data.segment_id.append([Dsub.segment_id[best]])
+            self.crossing_track_data.beam_pair.append([Dsub.BP[best]])
             self.crossing_track_data.ref_pt.append([self.ref_pt])
             self.crossing_track_data.latitude.append([self.ROOT.latitude])
             self.crossing_track_data.longitude.append([self.ROOT.longitude])
