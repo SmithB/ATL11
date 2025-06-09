@@ -40,7 +40,7 @@ class defaults:
         # order by sum, x and then y
         degree_order=np.argsort(sum_degree_list + (degree_list_y / (degree_list_y.max()+1)))
         self.poly_exponent_list=np.transpose(np.vstack((degree_list_x[degree_order], degree_list_y[degree_order]))).tolist()
-        self.poly_exponent={'x':degree_list_x, 'y':degree_list_y}
+        self.poly_exponent={'x':degree_list_x[degree_order], 'y':degree_list_y[degree_order]}
         self.N_coeffs=len(self.poly_exponent_list)
         self.hemisphere=None
         self.ATL06_xover_field_list=['delta_time','h_li','h_li_sigma','latitude',\
