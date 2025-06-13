@@ -22,7 +22,7 @@ import shutil
 #import matplotlib.pyplot as plt
 import resource as memresource
 import json
-from ATL11.check_ATL06_hold_list import read_hold_files
+
 #591 10 -F /Volumes/ice2/ben/scf/AA_06/001/cycle_02/ATL06_20190205041106_05910210_001_01.h5 -b -101. -76. -90. -74.5 -o test.h5 -G "/Volumes/ice2/ben/scf/AA_06/001/cycle*/index/GeoIndex.h5"
 #591 10 -F /Volumes/ice2/ben/scf/AA_06/001/cycle_02/ATL06_20190205041106_05910210_001_01.h5 -o test.h5 -G "/Volumes/ice2/ben/scf/AA_06/001/cycle*/index/GeoIndex.h5"
 
@@ -133,7 +133,7 @@ def main(argv):
         print("found GI files:"+str(GI_files))
 
     if args.use_hold_list:
-        hold_list=read_hold_files()
+        hold_list=ATL11.read_hold_files()
     else:
         hold_list=None
 
