@@ -36,7 +36,7 @@ def ATL11_browse_plots(ATL11_file, hemisphere=1, mosaic=None, out_path=None, pdf
     ATL11_file_str = os.path.basename(ATL11_file).split('.')[0]
     if out_path is None:
         out_path = os.path.dirname(ATL11_file)
-    if not args.nolog:        
+    if not nolog:        
         log_file = '{}/ATL11_BrowsePlots_{}.log'.format(out_path, dt.datetime.now().date())
         fhlog = open(log_file,'a')
     cycle_number = np.arange(int(ATL11_file_str.split('_')[2][:2]),int(ATL11_file_str.split('_')[2][2:])+1)
@@ -503,7 +503,7 @@ def ATL11_browse_plots(ATL11_file, hemisphere=1, mosaic=None, out_path=None, pdf
     # plt.show()
 #
     
-if __name__=='__main__':
+def main():
     import argparse
     parser=argparse.ArgumentParser()
     parser.add_argument('ATL11_file', type=str)
@@ -514,6 +514,9 @@ if __name__=='__main__':
     parser.add_argument('--nolog', action='store_true', default=False, help='no writing errors to .log file')
     args=parser.parse_args()
     ATL11_browse_plots(args.ATL11_file, hemisphere=args.Hemisphere, mosaic=args.mosaic, out_path=args.out_path, pdf=args.pdf)
+
+if __name__=="__main__":
+    main()
 
 
 
