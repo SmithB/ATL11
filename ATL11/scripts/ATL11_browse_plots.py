@@ -475,10 +475,10 @@ def ATL11_browse_plots(ATL11_file, hemisphere=1, mosaic=None, out_path=None, pdf
             namestr = os.path.basename(namestr).split('BRW_')[-1]
             dset = hf.create_dataset('default/'+namestr, img.shape, data=img.data, \
                                      chunks=img.shape, compression='gzip',compression_opts=6)
-            dset.attrs['CLASS'] = np.string_('IMAGE')
-            dset.attrs['IMAGE_VERSION'] = np.string_('1.2')
-            dset.attrs['IMAGE_SUBCLASS'] = np.string_('IMAGE_TRUECOLOR')
-            dset.attrs['INTERLACE_MODE'] = np.string_('INTERLACE_PIXEL')
+            dset.attrs['CLASS'] = np.bytes_('IMAGE')
+            dset.attrs['IMAGE_VERSION'] = np.bytes_('1.2')
+            dset.attrs['IMAGE_SUBCLASS'] = np.bytes_('IMAGE_TRUECOLOR')
+            dset.attrs['INTERLACE_MODE'] = np.bytes_('INTERLACE_PIXEL')
         for ii, name in enumerate(sorted(glob.glob('{0}/{1}_Figure*.png'.format(out_path,ATL11_file_str)))):
             if 'Figure1' not in name and 'Figure3' not in name:
                 img = imageio.imread(name, pilmode='RGB') 
@@ -487,10 +487,10 @@ def ATL11_browse_plots(ATL11_file, hemisphere=1, mosaic=None, out_path=None, pdf
                 namestr = os.path.basename(namestr).split('Figure')[-1]
                 dset = hf.create_dataset(namestr[2:], img.shape, data=img.data, \
                                          chunks=img.shape, compression='gzip',compression_opts=6)
-                dset.attrs['CLASS'] = np.string_('IMAGE')
-                dset.attrs['IMAGE_VERSION'] = np.string_('1.2')
-                dset.attrs['IMAGE_SUBCLASS'] = np.string_('IMAGE_TRUECOLOR')
-                dset.attrs['INTERLACE_MODE'] = np.string_('INTERLACE_PIXEL')
+                dset.attrs['CLASS'] = np.bytes_('IMAGE')
+                dset.attrs['IMAGE_VERSION'] = np.bytes_('1.2')
+                dset.attrs['IMAGE_SUBCLASS'] = np.bytes_('IMAGE_TRUECOLOR')
+                dset.attrs['INTERLACE_MODE'] = np.bytes_('INTERLACE_PIXEL')
         del hf['ancillary_data']
         with h5py.File(ATL11_file,'r') as g:
             g.copy('ancillary_data',hf)
