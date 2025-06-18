@@ -32,7 +32,8 @@ def get_proj4(hemisphere):
     if hemisphere==1:
         return '+proj=stere +lat_0=90 +lat_ts=70 +lon_0=-45 +k=1 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs '
 
-def main(argv):
+def main():
+    argv = sys.argv
     # Tunable: 2000 sounds OK
     BLOCKSIZE = 2000
     # account for a bug in argparse that misinterprets negative agruents
@@ -252,4 +253,4 @@ def main(argv):
 #        ATL11.ATL11_browse_plots.ATL11_browse_plots(out_file,args.Hemispher,mosaic=mosaic)
 
 if __name__=="__main__":
-    main(sys.argv)
+    main()
