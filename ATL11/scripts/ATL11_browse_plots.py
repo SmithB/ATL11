@@ -36,7 +36,7 @@ def ATL11_browse_plots(ATL11_file, hemisphere=1, mosaic=None, out_path=None, pdf
     ATL11_file_str = os.path.basename(ATL11_file).split('.')[0]
     if out_path is None:
         out_path = os.path.dirname(ATL11_file)
-    if not args.nolog:        
+    if not nolog:        
         log_file = '{}/ATL11_BrowsePlots_{}.log'.format(out_path, dt.datetime.now().date())
         fhlog = open(log_file,'a')
     cycle_number = np.arange(int(ATL11_file_str.split('_')[2][:2]),int(ATL11_file_str.split('_')[2][2:])+1)
@@ -475,10 +475,10 @@ def ATL11_browse_plots(ATL11_file, hemisphere=1, mosaic=None, out_path=None, pdf
             namestr = os.path.basename(namestr).split('BRW_')[-1]
             dset = hf.create_dataset('default/'+namestr, img.shape, data=img.data, \
                                      chunks=img.shape, compression='gzip',compression_opts=6)
-            dset.attrs['CLASS'] = np.string_('IMAGE')
-            dset.attrs['IMAGE_VERSION'] = np.string_('1.2')
-            dset.attrs['IMAGE_SUBCLASS'] = np.string_('IMAGE_TRUECOLOR')
-            dset.attrs['INTERLACE_MODE'] = np.string_('INTERLACE_PIXEL')
+            dset.attrs['CLASS'] = np.bytes_('IMAGE')
+            dset.attrs['IMAGE_VERSION'] = np.bytes_('1.2')
+            dset.attrs['IMAGE_SUBCLASS'] = np.bytes_('IMAGE_TRUECOLOR')
+            dset.attrs['INTERLACE_MODE'] = np.bytes_('INTERLACE_PIXEL')
         for ii, name in enumerate(sorted(glob.glob('{0}/{1}_Figure*.png'.format(out_path,ATL11_file_str)))):
             if 'Figure1' not in name and 'Figure3' not in name:
                 img = imageio.imread(name, pilmode='RGB') 
@@ -487,10 +487,10 @@ def ATL11_browse_plots(ATL11_file, hemisphere=1, mosaic=None, out_path=None, pdf
                 namestr = os.path.basename(namestr).split('Figure')[-1]
                 dset = hf.create_dataset(namestr[2:], img.shape, data=img.data, \
                                          chunks=img.shape, compression='gzip',compression_opts=6)
-                dset.attrs['CLASS'] = np.string_('IMAGE')
-                dset.attrs['IMAGE_VERSION'] = np.string_('1.2')
-                dset.attrs['IMAGE_SUBCLASS'] = np.string_('IMAGE_TRUECOLOR')
-                dset.attrs['INTERLACE_MODE'] = np.string_('INTERLACE_PIXEL')
+                dset.attrs['CLASS'] = np.bytes_('IMAGE')
+                dset.attrs['IMAGE_VERSION'] = np.bytes_('1.2')
+                dset.attrs['IMAGE_SUBCLASS'] = np.bytes_('IMAGE_TRUECOLOR')
+                dset.attrs['INTERLACE_MODE'] = np.bytes_('INTERLACE_PIXEL')
         del hf['ancillary_data']
         with h5py.File(ATL11_file,'r') as g:
             g.copy('ancillary_data',hf)
@@ -503,7 +503,7 @@ def ATL11_browse_plots(ATL11_file, hemisphere=1, mosaic=None, out_path=None, pdf
     # plt.show()
 #
     
-if __name__=='__main__':
+def main():
     import argparse
     parser=argparse.ArgumentParser()
     parser.add_argument('ATL11_file', type=str)
@@ -514,6 +514,9 @@ if __name__=='__main__':
     parser.add_argument('--nolog', action='store_true', default=False, help='no writing errors to .log file')
     args=parser.parse_args()
     ATL11_browse_plots(args.ATL11_file, hemisphere=args.Hemisphere, mosaic=args.mosaic, out_path=args.out_path, pdf=args.pdf)
+
+if __name__=="__main__":
+    main()
 
 
 
