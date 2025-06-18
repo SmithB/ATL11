@@ -519,12 +519,14 @@ class data(object):
             this_out_file="%s/ATL11_atxo_%04d%02d_%02d_%03d_%02d.h5" %( \
                 args.xover_output_dir,args.rgt, args.subproduct, int(cycle[0]), \
                 args.Release, args.Version)
+            # sort index by reference point
+            ind=ind[np.argsort(ref.ref_pt[ind,0])]
             # write crossing track data
             temp=crossing[ind]
             temp.assign(ref_pair = np.zeros(temp.shape, dtype=int)+int(self.pair_num))
             temp.assign(ref_rgt = np.zeros(temp.shape, dtype=int)+int(self.track_num))
             temp.ravel_fields()
-            temp.to_h5(this_out_file, group=f'pair_{self.pair_num}/crossing_track_data', replace=replace[0])
+            temp.to_h5(this_out_file, group=f'pt{self.pair_num}/crossing_track_data', replace=replace[0])
 
             # write reference track data
             col = np.flatnonzero(self.cycle_number==cycle)
@@ -545,12 +547,12 @@ class data(object):
                 temp.cycle_number[:]=cycle
                 for field in temp.fields:
                     temp_f = getattr(temp, field)
-                    if field not in ['ref_pt','cycle_number']:
+                    if field not in ['ref_pt','cycle_number','latitude','longitude']:
                         temp_f = temp_f.astype(float)+np.nan
                     setattr(temp, field, temp_f)
 
             temp.ravel_fields()
-            temp.to_h5(this_out_file, group=f'pair_{self.pair_num}/reference_track_data', replace=False)
+            temp.to_h5(this_out_file, group=f'pt{self.pair_num}/reference_track_data', replace=False)
         replace[0]=False
 
     def get_xovers(self,invalid_to_nan=True, calc_delta=False):
