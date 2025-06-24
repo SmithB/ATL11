@@ -35,7 +35,7 @@ def get_proj4(hemisphere):
 def main():
     argv = sys.argv
     # Tunable: 2000 sounds OK
-    BLOCKSIZE = 2000
+    BLOCKSIZE = 500
     # account for a bug in argparse that misinterprets negative agruents
     for i, arg in enumerate(argv):
         if (arg[0] == '-') and arg[1].isdigit(): argv[i] = ' ' + arg
@@ -161,7 +161,7 @@ def main():
         # skip this pair if no ref points are found
         if len(all_ref_pts)==0:
             continue
-        all_ref_pts, ind =np.unique(np.concatenate(all_ref_pts), return_index=True)
+        all_ref_pts, ind =np.unique(np.concatenate(all_ref_pts).astype(int), return_index=True)
         all_ref_pt_x = np.concatenate(all_ref_pt_x)[ind]
 
         # loop over all segments in blocks of BLOCKSIZE
@@ -173,7 +173,8 @@ def main():
 
         for block0 in blocks:
             ref_pt_range = [all_ref_pts[block0], all_ref_pts[np.minimum(len(all_ref_pts)-1, block0+BLOCKSIZE)]]
-            print(f'ref_pt_range={ref_pt_range}')
+            if args.verbose:
+                print(f'ref_pt_range={ref_pt_range}')
             seg_range=[np.maximum(0, ref_pt_range[0]-ATL11.defaults().N_search),
                        ref_pt_range[1]+ATL11.defaults().N_search]
 
@@ -195,7 +196,8 @@ def main():
 
             if len(ref_pt_numbers)==0:
                 continue
-            D11 += ATL11.data().from_ATL06(D6, ref_pt_numbers=ref_pt_numbers, ref_pt_x=ref_pt_x,\
+            # Performance improvement: set return_list to False.
+            D11 += [ATL11.data().from_ATL06(D6, ref_pt_numbers=ref_pt_numbers, ref_pt_x=ref_pt_x,\
                                            cycles=args.cycles, \
                                            beam_pair=pair, \
                                            verbose=args.verbose, \
@@ -205,15 +207,14 @@ def main():
                                            release_bias_dict=release_bias_dict,\
                                            max_xover_latitude=args.max_xover_latitude,
                                            hold_list=hold_list,
-                                           return_list=True) # defined in ATL06_to_ATL11
-
-            print("completed %d/%d blocks, ref_pt = %d, last %d segments in %2.2f s." %(list(blocks).index(block0)+1, len(blocks), np.nanmax(D6.segment_id), BLOCKSIZE, time.time()-last_time))
-            print(f"memory: {memresource.getrusage(memresource.RUSAGE_SELF).ru_maxrss}")
+                                           return_list=False)] # defined in ATL06_to_ATL11
+            if args.verbose:
+                print("completed %d/%d blocks, ref_pt = %d, last %d segments in %2.2f s." %(list(blocks).index(block0)+1, len(blocks), np.nanmax(D6.segment_id), BLOCKSIZE, time.time()-last_time))
+                print(f"memory: {memresource.getrusage(memresource.RUSAGE_SELF).ru_maxrss}")
             last_time=time.time()
         if len(D11) > 0:
-            cycles=[np.nanmin([Pi.cycles for Pi in D11]), np.nanmax([Pi.cycles for Pi in D11])]
             N_coeffs=np.nanmax([Pi.N_coeffs  for Pi in D11])
-            D11=ATL11.data(track_num=D11[0].rgt, beam_pair=pair, cycles=cycles, N_coeffs=N_coeffs).from_list(D11)
+            D11=ATL11.data(track_num=args.rgt, beam_pair=pair, cycles=args.cycles, N_coeffs=N_coeffs).from_list_of_ATL11_data(D11)
         else:
             D11=None
 
