@@ -69,6 +69,7 @@ def main():
     parser.add_argument('--start_date','-D', nargs='+', type=int, default=None, help="Start date, only for output metadata [YYYY DD MM]")
     args=parser.parse_args()
 
+    params_11=ATL11.defaults()
     # output file format is ATL11_RgtSubprod_c1c2_rel_vVer.h5
     out_file="%s/ATL11_%04d%02d_%02d%02d_%03d_%02d.h5" %( \
             args.out_dir,args.rgt, args.subproduct, args.cycles[0], \
@@ -197,7 +198,7 @@ def main():
             if len(ref_pt_numbers)==0:
                 continue
             # Performance improvement: set return_list to False.
-            D11 += [ATL11.data().from_ATL06(D6, ref_pt_numbers=ref_pt_numbers, ref_pt_x=ref_pt_x,\
+            D11i = ATL11.data().from_ATL06(D6, ref_pt_numbers=ref_pt_numbers, ref_pt_x=ref_pt_x,\
                                            cycles=args.cycles, \
                                            beam_pair=pair, \
                                            verbose=args.verbose, \
@@ -207,14 +208,15 @@ def main():
                                            release_bias_dict=release_bias_dict,\
                                            max_xover_latitude=args.max_xover_latitude,
                                            hold_list=hold_list,
-                                           return_list=False)] # defined in ATL06_to_ATL11
+                                           return_list=False)
+            if D11i is not None:
+                D11 += [D11i]
             if args.verbose:
                 print("completed %d/%d blocks, ref_pt = %d, last %d segments in %2.2f s." %(list(blocks).index(block0)+1, len(blocks), np.nanmax(D6.segment_id), BLOCKSIZE, time.time()-last_time))
                 print(f"memory: {memresource.getrusage(memresource.RUSAGE_SELF).ru_maxrss}")
             last_time=time.time()
         if len(D11) > 0:
-            N_coeffs=np.nanmax([Pi.N_coeffs  for Pi in D11])
-            D11=ATL11.data(track_num=args.rgt, beam_pair=pair, cycles=args.cycles, N_coeffs=N_coeffs).from_list_of_ATL11_data(D11)
+            D11=ATL11.data(track_num=args.rgt, beam_pair=pair, cycles=args.cycles, N_coeffs=params_11.N_coeffs).from_list_of_ATL11_data(D11)
         else:
             D11=None
 
