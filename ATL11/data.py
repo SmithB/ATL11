@@ -709,6 +709,7 @@ class data(object):
         # loop over reference points
         P11_list=list()
 
+        # sort the input ATL06 by segment id, keep the list of seg_id values
         D6_sort_ind = np.argsort(np.nanmax(D6.segment_id, axis=1))
         D6=D6[D6_sort_ind]
         segid_sorted = np.nanmax(D6.segment_id, axis=1)
@@ -723,12 +724,10 @@ class data(object):
             x_atc_ctr=ref_pt_x[count]
             # section 5.1.1
             #D6_sub=D6[np.any(np.abs(D6.segment_id-ref_pt) <= params_11.N_search, axis=1)]
+            # New feature: use numpy's searchsorted to find the indexes for the current ref_pt
             i0 = np.searchsorted(segid_sorted, ref_pt-params_11.N_search, side='left')
             i1 = np.searchsorted(segid_sorted, ref_pt+params_11.N_search, side='right')
-            #rows = [i0, i1]
             D6_sub=D6[i0:i1]
-            #brute_search = np.flatnonzero(np.any(np.abs(D6.segment_id-ref_pt) <= params_11.N_search, axis=1))
-            #print([rows, [np.min(brute_search), np.max(brute_search)]])
 
             if D6_sub.h_li.shape[0]<=1:
                 if verbose:
