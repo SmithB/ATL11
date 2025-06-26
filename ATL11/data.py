@@ -709,24 +709,22 @@ class data(object):
         # loop over reference points
         P11_list=list()
 
+        # New feature: use numpy's searchsorted to find the indexes for the current ref_pt
         # sort the input ATL06 by segment id, keep the list of seg_id values
         D6_sort_ind = np.argsort(np.nanmax(D6.segment_id, axis=1))
         D6=D6[D6_sort_ind]
         segid_sorted = np.nanmax(D6.segment_id, axis=1)
+        start_segid = np.searchsorted(segid_sorted, ref_pt_numbers-params_11.N_search, side='left')
+        end_segid = np.searchsorted(segid_sorted, ref_pt_numbers+params_11.N_search, side='right')
 
         D6_xyB = make_ATL06_xy_bins(D6, 100)
 
         if release_bias_dict is not None:
             ATL11.apply_release_bias(D6, release_bias_dict)
 
-        for count, ref_pt in enumerate(ref_pt_numbers):
+        for ref_pt, x_atc_ctr, i0, i1 in zip(ref_pt_numbers, ref_pt_x, start_segid, end_segid):
 
-            x_atc_ctr=ref_pt_x[count]
             # section 5.1.1
-            #D6_sub=D6[np.any(np.abs(D6.segment_id-ref_pt) <= params_11.N_search, axis=1)]
-            # New feature: use numpy's searchsorted to find the indexes for the current ref_pt
-            i0 = np.searchsorted(segid_sorted, ref_pt-params_11.N_search, side='left')
-            i1 = np.searchsorted(segid_sorted, ref_pt+params_11.N_search, side='right')
             D6_sub=D6[i0:i1]
 
             if D6_sub.h_li.shape[0]<=1:
