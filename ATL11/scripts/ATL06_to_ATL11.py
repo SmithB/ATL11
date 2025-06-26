@@ -34,8 +34,8 @@ def get_proj4(hemisphere):
 
 def main():
     argv = sys.argv
-    # Tunable: 2000 sounds OK
-    BLOCKSIZE = 500
+    # Tunable:
+    BLOCKSIZE = 2000
     # account for a bug in argparse that misinterprets negative agruents
     for i, arg in enumerate(argv):
         if (arg[0] == '-') and arg[1].isdigit(): argv[i] = ' ' + arg
@@ -145,6 +145,7 @@ def main():
         D6_segdata = ATL11.read_ATL06_data(files, beam_pair=pair,
                                            cycles=args.cycles,
                                            hold_list=hold_list,
+                                           read_latlon = (args.bounds is not None),
                                            minimal=True)
         all_ref_pts=[]
         all_ref_pt_x=[]
