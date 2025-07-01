@@ -107,7 +107,7 @@ def get_xover_data(x0, y0, rgt, GI_files, xover_cache, index_bin_size, params_11
             #    temp += new_data
             #t_GI = time.time()-t0
             #print(f't_tiles={t_tiles}, t_GI = {t_GI}')
-            if len(temp) == 0:
+            if len(temp_from_tiles) == 0:
                 xover_cache[this_key]=None
                 continue
             temp=pc.data(fields=params_11.ATL06_xover_field_list).from_list(temp_from_tiles)
