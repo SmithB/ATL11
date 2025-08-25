@@ -519,12 +519,14 @@ class data(object):
             this_out_file="%s/ATL11_atxo_%04d%02d_%02d_%03d_%02d.h5" %( \
                 args.xover_output_dir,args.rgt, args.subproduct, int(cycle[0]), \
                 args.Release, args.Version)
+            # sort index by reference point
+            ind=ind[np.argsort(ref.ref_pt[ind,0])]
             # write crossing track data
             temp=crossing[ind]
             temp.assign(ref_pair = np.zeros(temp.shape, dtype=int)+int(self.pair_num))
             temp.assign(ref_rgt = np.zeros(temp.shape, dtype=int)+int(self.track_num))
             temp.ravel_fields()
-            temp.to_h5(this_out_file, group=f'pair_{self.pair_num}/crossing_track_data', replace=replace[0])
+            temp.to_h5(this_out_file, group=f'pt{self.pair_num}/crossing_track_data', replace=replace[0])
 
             # write reference track data
             col = np.flatnonzero(self.cycle_number==cycle)
@@ -545,12 +547,12 @@ class data(object):
                 temp.cycle_number[:]=cycle
                 for field in temp.fields:
                     temp_f = getattr(temp, field)
-                    if field not in ['ref_pt','cycle_number']:
+                    if field not in ['ref_pt','cycle_number','latitude','longitude']:
                         temp_f = temp_f.astype(float)+np.nan
                     setattr(temp, field, temp_f)
 
             temp.ravel_fields()
-            temp.to_h5(this_out_file, group=f'pair_{self.pair_num}/reference_track_data', replace=False)
+            temp.to_h5(this_out_file, group=f'pt{self.pair_num}/reference_track_data', replace=False)
         replace[0]=False
 
     def get_xovers(self,invalid_to_nan=True, calc_delta=False):
@@ -707,16 +709,24 @@ class data(object):
         # loop over reference points
         P11_list=list()
 
+        # New feature: use numpy's searchsorted to find the indexes for the current ref_pt
+        # sort the input ATL06 by segment id, keep the list of seg_id values
+        D6_sort_ind = np.argsort(np.nanmax(D6.segment_id, axis=1))
+        D6=D6[D6_sort_ind]
+        segid_sorted = np.nanmax(D6.segment_id, axis=1)
+        start_segid = np.searchsorted(segid_sorted, ref_pt_numbers-params_11.N_search, side='left')
+        end_segid = np.searchsorted(segid_sorted, ref_pt_numbers+params_11.N_search, side='right')
+
         D6_xyB = make_ATL06_xy_bins(D6, 100)
 
         if release_bias_dict is not None:
             ATL11.apply_release_bias(D6, release_bias_dict)
 
-        for count, ref_pt in enumerate(ref_pt_numbers):
+        for ref_pt, x_atc_ctr, i0, i1 in zip(ref_pt_numbers, ref_pt_x, start_segid, end_segid):
 
-            x_atc_ctr=ref_pt_x[count]
             # section 5.1.1
-            D6_sub=D6[np.any(np.abs(D6.segment_id-ref_pt) <= params_11.N_search, axis=1)]
+            D6_sub=D6[i0:i1]
+
             if D6_sub.h_li.shape[0]<=1:
                 if verbose:
                     print("not enough data at ref pt=%d" % ref_pt)

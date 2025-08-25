@@ -17,7 +17,7 @@ parser.add_argument('--glob_06','-g', type=str, help="glob string used to find r
 parser.add_argument('--ATL06_dir','-A', type=str, help="directory or glob string used by ATL06_to_ATL11 to find input files")
 parser.add_argument('--index_glob','-i', type=str)
 parser.add_argument('--out_dir','-o', type=str)
-#parser.add_argument('--Version','-V', type=str, default='000')
+parser.add_argument('--xover_output_dir','-x', type=str)
 parser.add_argument('--Version','-V', type=str, default='00')
 parser.add_argument('--Release','-R', type=str, default='000')
 parser.add_argument('--max_rgt','-m', type=int, default=9999)
@@ -49,6 +49,9 @@ re_06=re.compile('ATL06_\d+_(\d\d\d\d)\d\d(\d\d)_(R?\d\d\d)')
 
 if not os.path.isdir(args.out_dir):
     os.mkdir(args.out_dir)
+
+if not os.path.isdir(args.xover_output_dir):
+    os.mkdir(args.xover_output_dir)
 
 if args.glob_06 is None:
     args.glob_06 = args.ATL06_dir+'/ATL06*.h5'
@@ -86,7 +89,7 @@ for file in ATL06_list:
 
     proc_list.append((rgt, subproduct))
 
-    cmd=f''+os.path.join(os.path.dirname(os.path.realpath(__file__)),'run_all_l3b_is.sh')+f' --rgt {rgt} --region {subproduct} --output_path {args.out_dir} --atl06_datapath \'{args.ATL06_dir}\' --version {args.Version} --start_cycle {args.cycles[0]} --end_cycle {args.cycles[1]} --hemisphere {args.Hemisphere} --release {args.Release}'
+    cmd=f''+os.path.join(os.path.dirname(os.path.realpath(__file__)),'run_all_l3b_is.sh')+f' --rgt {rgt} --region {subproduct} --output_path {args.out_dir} --atl06_datapath \'{args.ATL06_dir}\' --version {args.Version} --start_cycle {args.cycles[0]} --end_cycle {args.cycles[1]} --hemisphere {args.Hemisphere} --release {args.Release} --xover_output_dir {args.xover_output_dir}'
     if args.same_date:
         seconds_offset=int(rgt)*60 + int(subproduct)
         cmd +=f' --sec_offset {seconds_offset}'
