@@ -51,6 +51,7 @@ def main():
     parser.add_argument('--Version','-V', type=int, default=1, help="Version number")
     parser.add_argument('--cycles', '-c', type=int, nargs=2, default=[3, 4], help="first and last cycles")
     parser.add_argument('--GI_file_glob','-G', type=str, default=None, help="Glob (wildcard) string used to match geoindex files for crossing tracks")
+    parser.add_argument('--tile_dir_glob', type=str, default=None, help="Glob (wildcard) string used to match directories containing tiled ATL06 data for crossing tracks")
     parser.add_argument('--out_dir','-o', default=None, required=True, help="Output directory")
     parser.add_argument('--first_point','-f', type=int, default=None, help="First reference point")
     parser.add_argument('--last_point','-l', type=int, default=None, help="Last reference point")
@@ -134,6 +135,12 @@ def main():
     if args.verbose:
         print("found GI files:"+str(GI_files))
 
+    tile_dirs=None
+    if args.tile_dir_glob is not None:
+        tile_dirs = glob.glob(args.tile_dir_glob)
+    if args.verbose:
+        print("found tile dirs: " + str(tile_dirs)
+
     if args.use_hold_list:
         hold_list=ATL11.read_hold_files()
     else:
@@ -204,6 +211,7 @@ def main():
                                            beam_pair=pair, \
                                            verbose=args.verbose, \
                                            GI_files=GI_files, \
+                                           tile_dirs=tile_dirs, \
                                            hemisphere=args.Hemisphere, \
                                            atc_shift_table=atc_shift_table,\
                                            release_bias_dict=release_bias_dict,\

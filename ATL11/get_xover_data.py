@@ -15,6 +15,7 @@ import re
 from ATL11 import apply_release_bias
 from ATL11.check_ATL06_hold_list import check_ATL06_data_against_hold_list
 import time
+import os
 
 def get_ATL06_release(D6):
     if D6 is None:
@@ -34,7 +35,9 @@ def get_ATL06_release(D6):
         release.shape = D6i.h_li.shape
         D6i.assign({'release' : release})
 
-def get_xover_data(x0, y0, rgt, GI_files, xover_cache, index_bin_size, params_11,
+def get_xover_data(x0, y0, rgt, xover_cache, index_bin_size, params_11,
+                   GI_files=GI_files,
+                   tile_dirs=tile_dirs,
                    release_bias_dict=None,
                    hold_list=None,
                    verbose=False, xy_bin=None):
@@ -45,7 +48,8 @@ def get_xover_data(x0, y0, rgt, GI_files, xover_cache, index_bin_size, params_11
     Inputs:
         x0, y0: bin centers
         rgt: current rgt
-        GI_files: lsti of geograpic index file
+        GI_files: list of geograpic index files
+        tile_dirs: list of per-cycle atl06 tile dirs (specify if not specifying GI_files)
         xover_cache: data cache (dict)
         index_bin_size: size of the bins in the index
         params_11: default parameter values for the ATL11 fit
@@ -64,8 +68,9 @@ def get_xover_data(x0, y0, rgt, GI_files, xover_cache, index_bin_size, params_11
                     'BP',  'spot', 'LR',
                     'source_file_num']
 
-    import os
-    tile_dirs = [os.path.dirname(thefile) for thefile in GI_files]
+    if GI_files is None:
+        tile_dirs = [os.path.dirname(thefile) for thefile in GI_files]
+    
     dxb=1.e5
     # update the crossover cache
     for x0_ctr in x0_ctrs:
