@@ -14,6 +14,7 @@ import h5py
 import re
 from ATL11 import apply_release_bias
 from ATL11.check_ATL06_hold_list import check_ATL06_data_against_hold_list
+import time
 
 def get_ATL06_release(D6):
     if D6 is None:
@@ -63,6 +64,10 @@ def get_xover_data(x0, y0, rgt, GI_files, xover_cache, index_bin_size, params_11
                     'BP',  'spot', 'LR',
                     'source_file_num']
 
+    import os
+    tile_dirs = [os.path.dirname(thefile) for thefile in GI_files]
+    dxb=1.e5
+    # update the crossover cache
     for x0_ctr in x0_ctrs:
         this_key=(np.real(x0_ctr), np.imag(x0_ctr))
         # check if we have already read in the data for this bin
@@ -70,19 +75,26 @@ def get_xover_data(x0, y0, rgt, GI_files, xover_cache, index_bin_size, params_11
             if verbose > 1:
                 print(f"reading {this_key}")
             # if we haven't already read in the data, read it in.  These data will be in xover_cache[this_key]
-            temp=[]
-            for GI_file in GI_files:
-                new_data = pc.geoIndex().from_file(GI_file).query_xy(this_key, fields=ATL06_fields)
-                get_ATL06_release(new_data)
-                if new_data is None:
-                    continue
-                if xy_bin is not None:
-                    subset_data_to_bins(new_data, xy_bin, EPSG=params_11.EPSG)
-                temp += new_data
-            if len(temp) == 0:
+            tile_data_list=[]
+            if tile_dirs is not None:
+                for tile_dir in tile_dirs:
+                    tile_file = os.path.join(
+                        tile_dir,
+                        'E%d_N%d.h5' % (np.round(this_key[0]/dxb)*dxb, np.round(this_key[1]/dxb)*dxb))
+                    if not os.path.isfile(tile_file):
+                        continue
+                    new_data = pc.indexedH5.data(filename=tile_file)\
+                                .read([[jj] for jj in this_key],
+                                    fields=ATL06_fields)
+                    if new_data is None:
+                        continue
+                    if xy_bin is not None:
+                        subset_data_to_bins([new_data], xy_bin, EPSG=params_11.EPSG)
+                    tile_data_list += [new_data]
+            if len(tile_data_list) == 0:
                 xover_cache[this_key]=None
                 continue
-            temp=pc.data(fields=params_11.ATL06_xover_field_list + ['release']).from_list(temp)
+            temp=pc.data(fields=params_11.ATL06_xover_field_list).from_list(tile_data_list)
             if release_bias_dict is not None:
                 apply_release_bias(temp, release_bias_dict)
             xover_cache[this_key]={'D':temp}
