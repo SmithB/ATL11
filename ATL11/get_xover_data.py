@@ -36,11 +36,13 @@ def get_ATL06_release(D6):
         D6i.assign({'release' : release})
 
 def get_xover_data(x0, y0, rgt, xover_cache, index_bin_size, params_11,
-                   GI_files=GI_files,
-                   tile_dirs=tile_dirs,
+                   GI_files=None,
+                   tile_dirs=None,
                    release_bias_dict=None,
                    hold_list=None,
                    verbose=False, xy_bin=None):
+#                   GI_files=GI_files,
+#                   tile_dirs=tile_dirs,
     """
     Read the data from other tracks.
 
@@ -68,7 +70,7 @@ def get_xover_data(x0, y0, rgt, xover_cache, index_bin_size, params_11,
                     'BP',  'spot', 'LR',
                     'source_file_num']
 
-    if GI_files is None:
+    if GI_files is not None:
         tile_dirs = [os.path.dirname(thefile) for thefile in GI_files]
     
     dxb=1.e5
