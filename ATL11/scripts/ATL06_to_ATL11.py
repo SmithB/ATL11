@@ -139,7 +139,7 @@ def main():
     if args.tile_dir_glob is not None:
         tile_dirs = glob.glob(args.tile_dir_glob)
     if args.verbose:
-        print("found tile dirs: " + str(tile_dirs)
+        print("found tile dirs: " + str(tile_dirs))
 
     if args.use_hold_list:
         hold_list=ATL11.read_hold_files()
