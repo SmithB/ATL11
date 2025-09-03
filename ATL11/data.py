@@ -557,7 +557,7 @@ class data(object):
             temp.assign(ref_pair = np.zeros(temp.shape, dtype=int)+int(self.pair_num))
             temp.assign(ref_rgt = np.zeros(temp.shape, dtype=int)+int(self.track_num))
             temp.ravel_fields()
-            temp.to_h5(this_out_file, group=f'pt{self.pair_num}/crossing_track_data', replace=replace[0])
+            temp.to_h5(this_out_file, group=f'pt{self.pair_num}/crossing_track', replace=replace[0])
 
             # write reference track data
             col = np.flatnonzero(self.cycle_number==cycle)
@@ -583,7 +583,7 @@ class data(object):
                     setattr(temp, field, temp_f)
 
             temp.ravel_fields()
-            temp.to_h5(this_out_file, group=f'pt{self.pair_num}/reference_track_data', replace=False)
+            temp.to_h5(this_out_file, group=f'pt{self.pair_num}/datum_track', replace=False)
         replace[0]=False
 
     def get_xovers(self,invalid_to_nan=True, calc_delta=False):
