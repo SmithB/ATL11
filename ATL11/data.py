@@ -545,9 +545,8 @@ class data(object):
         ref, crossing = self.get_xovers()
         _, d_cyc = pc.unique_by_rows(crossing.cycle_number,
                                      return_dict=True)
-
         ref_context_fields={'ref_pt','cycle_number','rgt', 'latitude','longitude',
-                        'beam_pair', 'fit_quality','dem_h','geoid_h',
+                        'pair_track', 'fit_quality','dem_h','geoid_h',
                         'n_slope','e_slope','x_atc','y_atc'}
         for cycle, ind in d_cyc.items():
             this_out_file="%s/ATL11_atxo_%04d%02d_%02d_%03d_%02d.h5" %( \
@@ -557,12 +556,15 @@ class data(object):
             ind=ind[np.argsort(ref.ref_pt[ind,0])]
             # write crossing track data
             temp=crossing[ind]
+            # rename beam_pair to pair_track
+            temp.assign(pair_track=temp.beam_pair.copy())
+            temp.fields.remove('beam_pair')
+            #N.B.  ref_pair is not an output variable.  It is there as an internal check
             temp.assign(ref_pair = np.zeros(temp.shape, dtype=int)+int(self.pair_num))
             temp.assign(ref_rgt = np.zeros(temp.shape, dtype=int)+int(self.track_num))
             temp.ravel_fields()
             temp.to_h5(this_out_file, group=f'pt{self.pair_num}/crossing_track', replace=replace[0])
 
-            # write reference track data
             col = np.flatnonzero(self.cycle_number==cycle)
             if len(col)==0:
                 # if a cycle is not present in the input cycles, fill ref with NaNs (except cycle and ref_pt fields)
@@ -573,10 +575,12 @@ class data(object):
 
             # subset the reference track
             try:
-                temp=ref[ind,:][:,col]  # this should be ref[ind, col] but that's not working
+                temp=ref[ind,:][:,col]
             except Exception as e:
                 print(e)
-
+            # rename beam_pair to pair_track
+            temp.assign(pair_track=temp.beam_pair.copy())
+            temp.fields.remove('beam_pair')
             if fill_nans:
                 temp.cycle_number[:]=cycle
                 for field in temp.fields:
