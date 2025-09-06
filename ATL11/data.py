@@ -545,7 +545,9 @@ class data(object):
         ref, crossing = self.get_xovers()
         _, d_cyc = pc.unique_by_rows(crossing.cycle_number,
                                      return_dict=True)
-
+        ref_context_fields={'ref_pt','cycle_number','rgt', 'latitude','longitude',
+                        'pair_track', 'fit_quality','dem_h','geoid_h',
+                        'n_slope','e_slope','x_atc','y_atc'}
         for cycle, ind in d_cyc.items():
             this_out_file="%s/ATL11_atxo_%04d%02d_%02d_%03d_%02d.h5" %( \
                 args.xover_output_dir,args.rgt, args.subproduct, int(cycle[0]), \
@@ -554,12 +556,15 @@ class data(object):
             ind=ind[np.argsort(ref.ref_pt[ind,0])]
             # write crossing track data
             temp=crossing[ind]
+            # rename beam_pair to pair_track
+            temp.assign(pair_track=temp.beam_pair.copy())
+            temp.fields.remove('beam_pair')
+            #N.B.  ref_pair is not an output variable.  It is there as an internal check
             temp.assign(ref_pair = np.zeros(temp.shape, dtype=int)+int(self.pair_num))
             temp.assign(ref_rgt = np.zeros(temp.shape, dtype=int)+int(self.track_num))
             temp.ravel_fields()
             temp.to_h5(this_out_file, group=f'pt{self.pair_num}/crossing_track', replace=replace[0])
 
-            # write reference track data
             col = np.flatnonzero(self.cycle_number==cycle)
             if len(col)==0:
                 # if a cycle is not present in the input cycles, fill ref with NaNs (except cycle and ref_pt fields)
@@ -570,15 +575,17 @@ class data(object):
 
             # subset the reference track
             try:
-                temp=ref[ind,:][:,col]  # this should be ref[ind, col] but that's not working
+                temp=ref[ind,:][:,col]
             except Exception as e:
                 print(e)
-
+            # rename beam_pair to pair_track
+            temp.assign(pair_track=temp.beam_pair.copy())
+            temp.fields.remove('beam_pair')
             if fill_nans:
                 temp.cycle_number[:]=cycle
                 for field in temp.fields:
                     temp_f = getattr(temp, field)
-                    if field not in ['ref_pt','cycle_number','latitude','longitude']:
+                    if field not in ref_context_fields:
                         temp_f = temp_f.astype(float)+np.nan
                     setattr(temp, field, temp_f)
 
@@ -620,7 +627,8 @@ class data(object):
         both_fields = ['delta_time','h_corr','h_corr_sigma','h_corr_sigma_systematic',
                       'ref_pt','rgt','latitude','longitude',
                       'cycle_number', 'dh_geoloc','tide_ocean','dac']
-        ref_fields = ['x_atc','y_atc','fit_quality', 'atl06_quality_summary_zero_count']
+        ref_fields = ['x_atc','y_atc','fit_quality', 'atl06_quality_summary_zero_count',
+                      'dem_h', 'geoid_h', 'fit_quality','n_slope','e_slope']
         xo_fields = ['beam_pair', 'atl06_quality_summary','spot','segment_id', 'along_track_rss']
         for field in both_fields+ref_fields:
             xo['ref'][field]=[]
@@ -631,11 +639,8 @@ class data(object):
             i0=np.flatnonzero(self.ROOT.ref_pt==ref_pt)[0]
             # fill vectors
             for field in ['latitude','longitude']:
-                xo['ref'][field] += [getattr(self.ROOT, field)[i0]+zz]
-            for field in ['x_atc','y_atc']:
-                xo['ref'][field] += [getattr(self.ref_surf, field)[i0]+zz]
+                xo['ref'][field] += [getattr(self.ROOT, field)[i0] + zz]
             xo['ref']['ref_pt'] += [self.ROOT.ref_pt[i0]+zz]
-            xo['ref']['fit_quality'] += [self.ref_surf.fit_quality[i0]+zz]
             # set the crossing_track fields
             for field in both_fields + xo_fields:
                 xo['crossing'][field] += [getattr(self.crossing_track_data, field)[i1]]
@@ -647,6 +652,9 @@ class data(object):
             xo['ref']['cycle_number'] += [getattr(self.ROOT,'cycle_number')]
             for field in ['dh_geoloc','tide_ocean','dac']:
                 xo['ref'][field] += [getattr(self.cycle_stats, field)[i0,:]]
+            # fields from ref_surf
+            for field in ['x_atc','y_atc', 'fit_quality','n_slope','e_slope','dem_h','geoid_h']:
+                xo['ref'][field] += [getattr(self.ref_surf, field)[i0] + zz]
         for field in xo['crossing']:
             xo['crossing'][field]=np.array(xo['crossing'][field])
         for field in xo['ref']:
