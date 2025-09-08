@@ -28,6 +28,8 @@ class defaults:
         self.seg_number_skip=self.N_search
         self.pair_yatc_ctr = {1:3200, 2:0, 3:-3200} # expected beam-pair center locations
         self.pair_yatc_ctr_tol = 1000    # tolerance for y_atc center rejection
+        self.min_valid_h = -460
+        self.max_valid_h = 8400
 
         # calculate the order for the polynomial degrees:  Sorted by degree, then by y degree, no sum of x and y degrees larger than max(degree_x, degree_y)
         degree_list_x, degree_list_y = np.meshgrid(np.arange(self.poly_max_degree_AT+1), np.arange(self.poly_max_degree_XT+1))

@@ -759,6 +759,11 @@ class data(object):
             # section 5.1.1
             D6_sub=D6[i0:i1]
 
+            keep = (D6_sub.h_li > params_11.min_valid_h) & (D6_sub.h_li < params_11.max_valid_h)
+            if np.any(keep==0):
+                D6_sub.h_li[keep==0]=np.nan
+                D6_sub=D6_sub[np.any(np.isfinite(D6_sub.h_li), axis=1)]
+
             if D6_sub.h_li.shape[0]<=1:
                 if verbose:
                     print("not enough data at ref pt=%d" % ref_pt)
@@ -830,6 +835,12 @@ class data(object):
 
             # correct the heights from other cycles to the reference point using the reference surface
             P11.corr_heights_other_cycles(D6_sub)
+
+            invalid_h = (P11.ROOT.h_corr < params_11.min_valid_h) | (P11.ROOT.h_corr > params_11.max_valid_h)
+            if np.any(invalid_h):
+                P11.ROOT.h_corr[invalid_h] = np.nan
+                P11.ROOT.h_corr_sigma[invalid_h] = np.nan
+                P11.ROOT.h_corr_sigma_systematic[invalid_h] = np.nan
 
             P11.ROOT.quality_summary = np.logical_not(
                     (P11.cycle_stats.min_signal_selection_source <=1) &\
