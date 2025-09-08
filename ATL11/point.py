@@ -468,8 +468,11 @@ class point(ATL11.data):
             #m_surf_zp[fit_columns]=np.dot(G_g,h_li[selected_segs])
             # REVISION: use the specialized lstsq function from scipy.linalg
             try:
-                m_surf_zp[fit_columns]=\
-                        linalg.lstsq(np.sqrt(C_di).dot(G), np.sqrt(C_di).dot(h_li[selected_segs]))[0]
+                m_surf_zp[fit_columns], _, rank, __ = linalg.lstsq(np.sqrt(C_di).dot(G), np.sqrt(C_di).dot(h_li[selected_segs]), lapack_driver='gelsy')
+                if rank < G.shape[1]:
+                    print(f'\t ATL11.point.find_reference_surface: found design matrix with rank {rank} for {G.shape[1]} columns at ref point {self.ref_pt}')
+                    self.status['inversion failed'] = True
+                    return
             except:
                 self.status['inversion failed'] = True
                 return

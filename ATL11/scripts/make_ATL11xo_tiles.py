@@ -6,10 +6,14 @@ import glob
 import re
 import os
 import argparse
-
+import sys
 # Temporary: setup output names for reference-track and crossing-track groups (should not be necessary in production
 out_names = {'reference_track_data':'datum_track',
              'crossing_track_data':'crossing_track'}
+
+def make_queue(args):
+    for cycle in range(1, args.cycle+1):
+        print(f'make_ATL11xo_tiles.py --top_dir {args.top_dir} --dest_dir {args.dest_dir} --release {args.release} --version {args.version} --cycle {cycle} --region {args.region}')
 
 parser=argparse.ArgumentParser(description='Generate a set of ATL11xo tiles from a directory of ATL11_atxo along-track crossover files')
 parser.add_argument('--top_dir', type=str, required=True, help='top directory containing ATL11_atxo files')
@@ -18,9 +22,17 @@ parser.add_argument('--EPSG', type=int, required=False, help='EPSG string for ou
 parser.add_argument('--release', type=int, required=True, help='ATL11 release number')
 parser.add_argument('--version', type=int, required=True, help='ATL11xo version number')
 parser.add_argument('--cycle', type=int, required=True, help='cycle number')
+parser.add_argument('--queue','-q', action="store_true", help='if set, a queue of commands will be ouput that make tiles for cycles 1...args.cycle')
 parser.add_argument('--region', type=str, required=True, help='region for output, AA=Antarctic, AR=Arctic')
 parser.add_argument('--tile_spacing', type=float, default=200000, help='tile spacing,  m')
 args=parser.parse_args()
+
+if args.dest_dir is None:
+    args.dest_dir = args.top_dir
+
+if args.queue:
+    make_queue(args)
+    sys.exit(0)
 
 if args.EPSG is None:
     if args.region=='AA':
@@ -28,11 +40,11 @@ if args.EPSG is None:
     else:
         args.EPSG=3413
 
-if args.dest_dir is None:
-    args.dest_dir = args.top_dir
+    
 tile_out_dir = os.path.join(args.dest_dir, f'cycle_{args.cycle:02d}')
 if not os.path.isdir(tile_out_dir):
     os.mkdir(tile_out_dir)
+
 tS = pc.tilingSchema(mapping_function_name='floor', tile_spacing=args.tile_spacing, EPSG=args.EPSG,
                     format_str = f'ATL11xo_{args.region}_E%d_N%d_c{args.cycle:02d}_{args.release:03d}_{args.version:02d}')
 schema_file = os.path.join(tile_out_dir, f'{int(args.tile_spacing/1000)}km_tiling.json')
