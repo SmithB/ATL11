@@ -543,6 +543,8 @@ class data(object):
 
         '''
         ref, crossing = self.get_xovers()
+        if crossing is None or crossing.cycle_number.size==0:
+            return
         _, d_cyc = pc.unique_by_rows(crossing.cycle_number,
                                      return_dict=True)
         ref_context_fields={'ref_pt','cycle_number','rgt', 'latitude','longitude',
