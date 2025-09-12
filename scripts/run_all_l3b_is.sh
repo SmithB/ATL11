@@ -17,6 +17,7 @@ while [[ "$#" -gt 0 ]]; do
         -n|--region) region="$2"; shift ;;
         -a|--atl06_datapath) atl06_datapath="$2"; shift ;;
         -G|--geoindex_path) geoindex_path="$2"; shift ;;
+        -T|--tile_path) tile_path="$2"; shift ;;
         -R|--release) release="$2"; shift ;;
         -V|--version) version="$2"; shift ;;
         -o|--output_path) output_path="$2"; shift ;;
@@ -74,7 +75,7 @@ if [ ! -e $atl11_outfile ]; then
   fi
   # Call ATL06_to_ATL11
 #  $PYTHONPATH/ATL11/scripts/ATL06_to_ATL11.py $rgt $region --cycles $start_cycle $end_cycle -d "$atl06_datapath" -R $release -V $version -o $output_path -H $hemisphere -G "$geoindex_path" $xy_bias_arg $sec_offset_arg $scratch --verbose  | tee -a $logfile
-  ATL06_to_ATL11.py $rgt $region --cycles $start_cycle $end_cycle -d "$atl06_datapath" -R $release -V $version -o $output_path -H $hemisphere -G "$geoindex_path" $xy_bias_arg $sec_offset_arg $scratch --xover_output_dir $xover_output_dir --verbose  | tee -a $logfile
+  ATL06_to_ATL11.py $rgt $region --cycles $start_cycle $end_cycle -d "$atl06_datapath" -R $release -V $version -o $output_path -H $hemisphere --tile_dir_glob "$tile_path" $xy_bias_arg $sec_offset_arg $scratch --xover_output_dir $xover_output_dir --verbose  | tee -a $logfile
   RES=${PIPESTATUS[0]}
   if [ ${RES} -ne 0 ] ; then
     echo "${THIS_SCRIPT} Warning: ATL06_to_ATL11.py did not complete successfully"
