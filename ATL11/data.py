@@ -864,6 +864,12 @@ class data(object):
             P11.ref_surf.dem_h=regress_to(D6_sub,
                                           ['dem_h'], ['x_atc', 'y_atc'],
                                           [x_atc_ctr,P11.y_atc_ctr])
+            # Temporary rel007 bug fix
+            if (P11.ref_surf.dem_h < params_11.min_valid_h) | (P11.ref_surf.dem_h > params_11.max_valid_h):
+                print(f"\t ATL11/data.py: found ref_surf.dem_h of {P11.ref_surf.dem_h} at lat, lon = {np.nanmean(D6_sub.latitude)} {np.nanmean(D6_sub.longitude)}")
+                print(f"\t\t setting output value to invalid for reference point {P11.ref_pt}")
+                P11.ref_surf.dem_h = np.nan
+
             # get the geoid height
             P11.ref_surf.geoid_h=regress_to(D6_sub,
                                           ['geoid_h'], ['x_atc', 'y_atc'],
