@@ -7,9 +7,6 @@ import re
 import os
 import argparse
 import sys
-# Temporary: setup output names for reference-track and crossing-track groups (should not be necessary in production
-out_names = {'reference_track_data':'datum_track',
-             'crossing_track_data':'crossing_track'}
 
 def make_queue(args):
     for cycle in range(1, args.cycle+1):
@@ -53,19 +50,19 @@ if not os.path.isfile(schema_file):
 tS.directory=tile_out_dir
 
 replace=True
-for group in ['reference_track_data','crossing_track_data']:
+for group in ['datum_track','crossing_track']:
     D=[]
     for file in glob.glob(args.top_dir+f'/ATL11_atxo*_*_{args.cycle:02d}_*.h5'):
         for pair in [1, 2, 3]:
             try:
                 D += [pc.data().from_h5(file, group=f'pt{pair}/{group}')]
-            except Exception:
+            except Exception as e:
                 pass
     D=pc.data().from_list(D).get_xy(args.EPSG)
     bins, bin_dict = tS.tile_xy(data=D, return_dict=True)
     for xyT, ii in bin_dict.items():
         out_file = tS.tile_filename(xyT)
-        if os.path.isfile(out_file) and group=='reference_track_data' :
+        if os.path.isfile(out_file) and group=='datum_track' :
             os.remove(out_file)
-        D[ii].to_h5(out_file, group=out_names[group], replace=replace)
+        D[ii].to_h5(out_file, group=group, replace=replace)
         replace=False
