@@ -14,108 +14,110 @@ import h5py
 def make_queue(args):
     for cycle in range(1, args.cycle+1):
         print(f'make_ATL11xo_tiles.py --top_dir {args.top_dir} --dest_dir {args.dest_dir} --release {args.release} --version {args.version} --cycle {cycle} --region {args.region}')
+def main():
+    parser=argparse.ArgumentParser(description='Generate a set of ATL11xo tiles from a directory of ATL11_atxo along-track crossover files')
+    parser.add_argument('--top_dir', type=str, required=True, help='top directory containing ATL11_atxo files')
+    parser.add_argument('--dest_dir', type=str, required=False, help='output directory for ATL11xo files')
+    parser.add_argument('--EPSG', type=int, required=False, help='EPSG string for output')
+    parser.add_argument('--release', type=int, required=True, help='ATL11 release number')
+    parser.add_argument('--version', type=int, required=True, help='ATL11xo version number')
+    parser.add_argument('--cycle', type=int, required=True, help='cycle number')
+    parser.add_argument('--queue','-q', action="store_true", help='if set, a queue of commands will be ouput that make tiles for cycles 1...args.cycle')
+    parser.add_argument('--region', type=str, required=True, help='region for output, AA=Antarctic, AR=Arctic')
+    parser.add_argument('--tile_spacing', type=float, default=200000, help='tile spacing,  m')
+    args=parser.parse_args()
 
-parser=argparse.ArgumentParser(description='Generate a set of ATL11xo tiles from a directory of ATL11_atxo along-track crossover files')
-parser.add_argument('--top_dir', type=str, required=True, help='top directory containing ATL11_atxo files')
-parser.add_argument('--dest_dir', type=str, required=False, help='output directory for ATL11xo files')
-parser.add_argument('--EPSG', type=int, required=False, help='EPSG string for output')
-parser.add_argument('--release', type=int, required=True, help='ATL11 release number')
-parser.add_argument('--version', type=int, required=True, help='ATL11xo version number')
-parser.add_argument('--cycle', type=int, required=True, help='cycle number')
-parser.add_argument('--queue','-q', action="store_true", help='if set, a queue of commands will be ouput that make tiles for cycles 1...args.cycle')
-parser.add_argument('--region', type=str, required=True, help='region for output, AA=Antarctic, AR=Arctic')
-parser.add_argument('--tile_spacing', type=float, default=200000, help='tile spacing,  m')
-args=parser.parse_args()
+    if args.dest_dir is None:
+        args.dest_dir = args.top_dir
 
-if args.dest_dir is None:
-    args.dest_dir = args.top_dir
+    if args.queue:
+        make_queue(args)
+        sys.exit(0)
 
-if args.queue:
-    make_queue(args)
-    sys.exit(0)
-
-if args.EPSG is None:
-    if args.region=='AA':
-        args.EPSG=3031
-    else:
-        args.EPSG=3413
-
-
-tile_out_dir = os.path.join(args.dest_dir, f'cycle_{args.cycle:02d}')
-if not os.path.isdir(tile_out_dir):
-    os.mkdir(tile_out_dir)
-
-tS = pc.tilingSchema(mapping_function_name='floor', tile_spacing=args.tile_spacing, EPSG=args.EPSG,
-                    format_str = f'ATL11xo_{args.region}_E%d_N%d_c{args.cycle:02d}_{args.release:03d}_{args.version:02d}')
-schema_file = os.path.join(tile_out_dir, f'{int(args.tile_spacing/1000)}km_tiling_{args.region}.json')
-if not os.path.isfile(schema_file):
-    tS.to_json(schema_file)
-tS.directory=tile_out_dir
+    if args.EPSG is None:
+        if args.region=='AA':
+            args.EPSG=3031
+        else:
+            args.EPSG=3413
 
 
-# read in the metadata
-attrfile=os.path.join(str(resources.files('ATL11')), 'package_data', 'ATL11xo_output_attrs.csv')
-all_field_attrs=list(csv.DictReader(open(attrfile, encoding='utf-8-sig')))
+    tile_out_dir = os.path.join(args.dest_dir, f'cycle_{args.cycle:02d}')
+    if not os.path.isdir(tile_out_dir):
+        os.mkdir(tile_out_dir)
 
-groups = set([jj['group'] for jj in all_field_attrs])
-group_attrs={}
-group_descriptions={}
+    tS = pc.tilingSchema(mapping_function_name='floor', tile_spacing=args.tile_spacing, EPSG=args.EPSG,
+                        format_str = f'ATL11xo_{args.region}_E%d_N%d_c{args.cycle:02d}_{args.release:03d}_{args.version:02d}')
+    schema_file = os.path.join(tile_out_dir, f'{int(args.tile_spacing/1000)}km_tiling_{args.region}.json')
+    if not os.path.isfile(schema_file):
+        tS.to_json(schema_file)
+    tS.directory=tile_out_dir
 
-for field_attrs in all_field_attrs:
-    group_name = field_attrs['group']
-    if group_name not in group_attrs:
-        group_attrs[group_name] = {}
-    this_group = group_attrs[group_name]
-    field = field_attrs['field']
-    if len(field) == 0:
-        group_descriptions[group_name] = field_attrs['description']
-        continue
-    if field not in this_group:
-        this_group[field] = {}
-    for attr, val in field_attrs.items():
-        if attr in ['field','group']:
+
+    # read in the metadata
+    attrfile=os.path.join(str(resources.files('ATL11')), 'package_data', 'ATL11xo_output_attrs.csv')
+    all_field_attrs=list(csv.DictReader(open(attrfile, encoding='utf-8-sig')))
+
+    group_attrs={}
+    group_descriptions={}
+
+    # make a dictionary listing attributes for each group
+    for field_attrs in all_field_attrs:
+        group_name = field_attrs['group']
+        if group_name not in group_attrs:
+            group_attrs[group_name] = {}
+        this_group = group_attrs[group_name]
+        field = field_attrs['field']
+        if len(field) == 0:
+            # zero-length field indicates a group description
+            group_descriptions[group_name] = field_attrs['description']
             continue
-
-        if 'valid_m' in attr:
-            # make sure valid_max and valid_min match the variable's datatype
-            if val == '':
+        if field not in this_group:
+            this_group[field] = {}
+        for attr, val in field_attrs.items():
+            if attr in ['field','group']:
                 continue
-            this_group[field][attr] = np.dtype(field_attrs['datatype'].lower()).type(val)
-        else:
-            # otherwise write a string
-            this_group[field][attr] = str(val)
+
+            #'valid_min' and 'valid_max' fields are numeric
+            if 'valid_m' in attr:
+                # make sure valid_max and valid_min match the variable's datatype
+                if val == '':
+                    continue
+                this_group[field][attr] = np.dtype(field_attrs['datatype'].lower()).type(val)
+            else:
+                # otherwise write a string
+                this_group[field][attr] = str(val)
 
 
-replace=True
-index_for_xyT = {}
-for group in ['crossing_track', 'datum_track']:
-    D=[]
-    for file in glob.glob(args.top_dir+f'/ATL11_atxo*_*_{args.cycle:02d}_*.h5')[0:20]:
-        for pair in [1, 2, 3]:
-            try:
-                D += [pc.data().from_h5(file, group=f'pt{pair}/{group}')]
-            except Exception as e:
-                pass
-    D=pc.data().from_list(D).get_xy(args.EPSG)
-    bins, bin_dict = tS.tile_xy(data=D, return_dict=True)
-    for xyT, ii in bin_dict.items():
-        Dsub=D[ii]
-        # make an index that sorts the data by floor(y/10k), then floor(x/10k), then delta_time
-        if xyT not in index_for_xyT:
-            index_for_xyT[xyT] = np.lexsort((Dsub.delta_time, np.floor(Dsub.x/1.e4), np.floor(Dsub.y/1.e4)))
-        Dsub = Dsub[index_for_xyT[xyT]]
-        Dsub.assign(xo_index=np.arange(0, Dsub.size, dtype=int))
-        # choose the out file
-        out_file = tS.tile_filename(xyT)
-        if os.path.isfile(out_file) and group=='crossing_track' :
-            os.remove(out_file)
-            replace=True
-        else:
-            replace=False
-        # write the data
-        Dsub.to_h5(out_file, group=group,
-                   replace=replace,
-                   meta_dict=group_attrs[group])
-        with h5py.File(out_file,'a') as fh:
-            fh[group].attrs['description'.encode('ascii')] =\
-                group_descriptions[group].encode('ascii')
+    replace=True
+    index_for_xyT = {}
+    for group in ['crossing_track', 'datum_track']:
+        D=[]
+        for file in glob.glob(args.top_dir+f'/ATL11_atxo*_*_{args.cycle:02d}_*.h5')[0:20]:
+            for pair in [1, 2, 3]:
+                try:
+                    D += [pc.data().from_h5(file, group=f'pt{pair}/{group}')]
+                except Exception:
+                    pass
+        D=pc.data().from_list(D).get_xy(args.EPSG)
+        bins, bin_dict = tS.tile_xy(data=D, return_dict=True)
+        for xyT, ii in bin_dict.items():
+            Dsub=D[ii]
+            # make an index that sorts the data by floor(y/10k), then floor(x/10k), then delta_time
+            if xyT not in index_for_xyT:
+                index_for_xyT[xyT] = np.lexsort((Dsub.delta_time, np.floor(Dsub.x/1.e4), np.floor(Dsub.y/1.e4)))
+            Dsub = Dsub[index_for_xyT[xyT]]
+            Dsub.assign(xo_index=np.arange(0, Dsub.size, dtype=int))
+            # choose the out file
+            out_file = tS.tile_filename(xyT)
+            if os.path.isfile(out_file) and group=='crossing_track' :
+                os.remove(out_file)
+                replace=True
+            else:
+                replace=False
+            # write the data
+            Dsub.to_h5(out_file, group=group,
+                       replace=replace,
+                       meta_dict=group_attrs[group])
+            with h5py.File(out_file,'a') as fh:
+                fh[group].attrs['description'.encode('ascii')] =\
+                    group_descriptions[group].encode('ascii')
