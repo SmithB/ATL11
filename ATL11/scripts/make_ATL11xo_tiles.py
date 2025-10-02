@@ -90,7 +90,7 @@ replace=True
 index_for_xyT = {}
 for group in ['crossing_track', 'datum_track']:
     D=[]
-    for file in glob.glob(args.top_dir+f'/ATL11_atxo*_*_{args.cycle:02d}_*.h5'):
+    for file in glob.glob(args.top_dir+f'/ATL11_atxo*_*_{args.cycle:02d}_*.h5')[0:20]:
         for pair in [1, 2, 3]:
             try:
                 D += [pc.data().from_h5(file, group=f'pt{pair}/{group}')]
@@ -102,7 +102,7 @@ for group in ['crossing_track', 'datum_track']:
         Dsub=D[ii]
         # make an index that sorts the data by floor(y/10k), then floor(x/10k), then delta_time
         if xyT not in index_for_xyT:
-            index_for_xyT[xyT] = np.lexsort((D.delta_time, np.floor(D.x/1.e4), np.floor(D.y/1.e4)))
+            index_for_xyT[xyT] = np.lexsort((Dsub.delta_time, np.floor(Dsub.x/1.e4), np.floor(Dsub.y/1.e4)))
         Dsub = Dsub[index_for_xyT[xyT]]
         Dsub.assign(xo_index=np.arange(0, Dsub.size, dtype=int))
         # choose the out file
@@ -116,6 +116,6 @@ for group in ['crossing_track', 'datum_track']:
         Dsub.to_h5(out_file, group=group,
                    replace=replace,
                    meta_dict=group_attrs[group])
-        with h5py.File(out_file,'w') as fh:
+        with h5py.File(out_file,'a') as fh:
             fh[group].attrs['description'.encode('ascii')] =\
-                group_descriptions[group].enode('ascii')
+                group_descriptions[group].encode('ascii')
