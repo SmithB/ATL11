@@ -7,6 +7,9 @@ import re
 import os
 import argparse
 import sys
+from importlib import resources
+import csv
+import h5py
 
 def make_queue(args):
     for cycle in range(1, args.cycle+1):
@@ -37,20 +40,55 @@ if args.EPSG is None:
     else:
         args.EPSG=3413
 
-    
+
 tile_out_dir = os.path.join(args.dest_dir, f'cycle_{args.cycle:02d}')
 if not os.path.isdir(tile_out_dir):
     os.mkdir(tile_out_dir)
 
 tS = pc.tilingSchema(mapping_function_name='floor', tile_spacing=args.tile_spacing, EPSG=args.EPSG,
                     format_str = f'ATL11xo_{args.region}_E%d_N%d_c{args.cycle:02d}_{args.release:03d}_{args.version:02d}')
-schema_file = os.path.join(tile_out_dir, f'{int(args.tile_spacing/1000)}km_tiling.json')
+schema_file = os.path.join(tile_out_dir, f'{int(args.tile_spacing/1000)}km_tiling_{args.region}.json')
 if not os.path.isfile(schema_file):
     tS.to_json(schema_file)
 tS.directory=tile_out_dir
 
+
+# read in the metadata
+attrfile=os.path.join(str(resources.files('ATL11')), 'package_data', 'ATL11xo_output_attrs.csv')
+all_field_attrs=list(csv.DictReader(open(attrfile, encoding='utf-8-sig')))
+
+groups = set([jj['group'] for jj in all_field_attrs])
+group_attrs={}
+group_descriptions={}
+
+for field_attrs in all_field_attrs:
+    group_name = field_attrs['group']
+    if group_name not in group_attrs:
+        group_attrs[group_name] = {}
+    this_group = group_attrs[group_name]
+    field = field_attrs['field']
+    if len(field) == 0:
+        group_descriptions[group_name] = field_attrs['description']
+        continue
+    if field not in this_group:
+        this_group[field] = {}
+    for attr, val in field_attrs.items():
+        if attr in ['field','group']:
+            continue
+
+        if 'valid_m' in attr:
+            # make sure valid_max and valid_min match the variable's datatype
+            if val == '':
+                continue
+            this_group[field][attr] = np.dtype(field_attrs['datatype'].lower()).type(val)
+        else:
+            # otherwise write a string
+            this_group[field][attr] = str(val)
+
+
 replace=True
-for group in ['datum_track','crossing_track']:
+index_for_xyT = {}
+for group in ['crossing_track', 'datum_track']:
     D=[]
     for file in glob.glob(args.top_dir+f'/ATL11_atxo*_*_{args.cycle:02d}_*.h5'):
         for pair in [1, 2, 3]:
@@ -61,8 +99,23 @@ for group in ['datum_track','crossing_track']:
     D=pc.data().from_list(D).get_xy(args.EPSG)
     bins, bin_dict = tS.tile_xy(data=D, return_dict=True)
     for xyT, ii in bin_dict.items():
+        Dsub=D[ii]
+        # make an index that sorts the data by floor(y/10k), then floor(x/10k), then delta_time
+        if xyT not in index_for_xyT:
+            index_for_xyT[xyT] = np.lexsort((D.delta_time, np.floor(D.x/1.e4), np.floor(D.y/1.e4)))
+        Dsub = Dsub[index_for_xyT[xyT]]
+        Dsub.assign(xo_index=np.arange(0, Dsub.size, dtype=int))
+        # choose the out file
         out_file = tS.tile_filename(xyT)
-        if os.path.isfile(out_file) and group=='datum_track' :
+        if os.path.isfile(out_file) and group=='crossing_track' :
             os.remove(out_file)
-        D[ii].to_h5(out_file, group=group, replace=replace)
-        replace=False
+            replace=True
+        else:
+            replace=False
+        # write the data
+        Dsub.to_h5(out_file, group=group,
+                   replace=replace,
+                   meta_dict=group_attrs[group])
+        with h5py.File(out_file,'w') as fh:
+            fh[group].attrs['description'.encode('ascii')] =\
+                group_descriptions[group].enode('ascii')
