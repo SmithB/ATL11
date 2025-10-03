@@ -10,10 +10,27 @@ import sys
 from importlib import resources
 import csv
 import h5py
+import uuid
+from ATL11.h5util import create_attribute
 
 def make_queue(args):
     for cycle in range(1, args.cycle+1):
         print(f'make_ATL11xo_tiles.py --top_dir {args.top_dir} --dest_dir {args.dest_dir} --release {args.release} --version {args.version} --cycle {cycle} --region {args.region}')
+
+def write_meta_fields(D, h5f):
+    ''' Write the metadata fields to an hdf5 file handle '''
+
+    g0=h5f.create_group('METADATA')
+    g1=h5f.create_group('METADATA/DatasetIdentification')
+    create_attribute(g1.id, 'uuid', [], str(uuid.uuid4()))
+    g2 = h5f.create_group('ancillary_data')
+    g2.create_dataset('start_delta_time',data=np.array([np.nanmin(D.delta_time)]))
+    g2.create_dataset('end_delta_time',data=np.array([np.nanmax(D.delta_time)]))
+    g2.create_dataset('start_geoseg',data=np.array([np.nanmin(D.segment_id).astype(int)]))
+    g2.create_dataset('end_geoseg',data=np.array([np.nanmax(D.segment_id).astype(int)]))
+    g2.create_dataset('start_rgt',data=np.array([np.nanmin(D.rgt).astype(int)]))
+    g2.create_dataset('end_rgt',data=np.array([np.nanmax(D.rgt).astype(int)]))
+
 def main():
     parser=argparse.ArgumentParser(description='Generate a set of ATL11xo tiles from a directory of ATL11_atxo along-track crossover files')
     parser.add_argument('--top_dir', type=str, required=True, help='top directory containing ATL11_atxo files')
@@ -25,6 +42,7 @@ def main():
     parser.add_argument('--queue','-q', action="store_true", help='if set, a queue of commands will be ouput that make tiles for cycles 1...args.cycle')
     parser.add_argument('--region', type=str, required=True, help='region for output, AA=Antarctic, AR=Arctic')
     parser.add_argument('--tile_spacing', type=float, default=200000, help='tile spacing,  m')
+    parser.add_argument('--max_files', type=int, default=-1, help='if specified, limit number of ATL11 files to this, default is -1 (all_files)')
     args=parser.parse_args()
 
     if args.dest_dir is None:
@@ -92,7 +110,7 @@ def main():
     index_for_xyT = {}
     for group in ['crossing_track', 'datum_track']:
         D=[]
-        for file in glob.glob(args.top_dir+f'/ATL11_atxo*_*_{args.cycle:02d}_*.h5')[0:20]:
+        for file in glob.glob(args.top_dir+f'/ATL11_atxo*_*_{args.cycle:02d}_*.h5')[:args.max_files]:
             for pair in [1, 2, 3]:
                 try:
                     D += [pc.data().from_h5(file, group=f'pt{pair}/{group}')]
@@ -121,3 +139,7 @@ def main():
             with h5py.File(out_file,'a') as fh:
                 fh[group].attrs['description'.encode('ascii')] =\
                     group_descriptions[group].encode('ascii')
+                if group=='crossing_track':
+                    write_meta_fields(Dsub, fh)
+if __name__=="__main__":
+    main()
