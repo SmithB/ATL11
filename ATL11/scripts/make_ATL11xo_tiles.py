@@ -70,7 +70,6 @@ def main():
         tS.to_json(schema_file)
     tS.directory=tile_out_dir
 
-
     # read in the metadata
     attrfile=os.path.join(str(resources.files('ATL11')), 'package_data', 'ATL11xo_output_attrs.csv')
     all_field_attrs=list(csv.DictReader(open(attrfile, encoding='utf-8-sig')))
@@ -81,6 +80,9 @@ def main():
     # make a dictionary listing attributes for each group
     for field_attrs in all_field_attrs:
         group_name = field_attrs['group']
+        if len(group_name)==0:
+            # blank line
+            continue
         if group_name not in group_attrs:
             group_attrs[group_name] = {}
         this_group = group_attrs[group_name]
@@ -108,7 +110,8 @@ def main():
 
     replace=True
     index_for_xyT = {}
-    for group in ['crossing_track', 'datum_track']:
+    D_root = {}
+    for group in ['crossing_track', 'datum_track','ROOT']:
         D=[]
         for file in glob.glob(args.top_dir+f'/ATL11_atxo*_*_{args.cycle:02d}_*.h5')[:args.max_files]:
             for pair in [1, 2, 3]:
@@ -119,6 +122,8 @@ def main():
         D=pc.data().from_list(D).get_xy(args.EPSG)
         bins, bin_dict = tS.tile_xy(data=D, return_dict=True)
         for xyT, ii in bin_dict.items():
+            if xyT not in D_root:
+                D_root[xyT]={}
             Dsub=D[ii]
             # make an index that sorts the data by floor(y/10k), then floor(x/10k), then delta_time
             if xyT not in index_for_xyT:
@@ -132,14 +137,30 @@ def main():
                 replace=True
             else:
                 replace=False
+
+            
+            if group=='ROOT':
+                out_group='/'
+                Dsub=pc.data().from_dict(D_root[xyT])
+            else:
+                out_group=group
+                for field in Dsub.fields:
+                    # some fields come from ref_track or crossing_track
+                    # but need to be in ROOT
+                    if field in group_attrs['ROOT']:
+                        D_root[xyT][field] = getattr(Dsub, field)
+                        Dsub.fields.remove(field)
+            
             # write the data
-            Dsub.to_h5(out_file, group=group,
+            Dsub.to_h5(out_file, group=out_group,
                        replace=replace,
                        meta_dict=group_attrs[group])
             with h5py.File(out_file,'a') as fh:
-                fh[group].attrs['description'.encode('ascii')] =\
-                    group_descriptions[group].encode('ascii')
+                if group in group_descriptions:
+                    fh[group].attrs['description'.encode('ascii')] =\
+                        group_descriptions[group].encode('ascii')
                 if group=='crossing_track':
+                    # this group contains delta_time segment and rgt
                     write_meta_fields(Dsub, fh)
 if __name__=="__main__":
     main()
