@@ -1,5 +1,5 @@
 ﻿group,field,units,dimensions,datatype,description,long_name,source,coordinates,valid_min,valid_max
-ROOT,,,,,Data common to datum track and crossing track,,,,,
+ROOT,,,,,,,,,,
 ROOT,xo_index,counts,"NXO,1",int64,Order of points within the file,data index,"Derived, ATL11 algorithm",,0,
 ROOT,latitude,degrees,"NXO,1",float64,latitude of the reference point,reference point latitude,"Derived, ATL11 algorithm",xo_index,-90,90
 ROOT,longitude,degrees,"NXO,1",float64,longitude of the reference point,reference point longitude,"Derived, ATL11 algorithm",xo_index,-180,180
