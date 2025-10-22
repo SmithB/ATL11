@@ -15,9 +15,9 @@ from ATL11.h5util import create_attribute
 
 def make_queue(args):
     for cycle in range(1, args.cycle+1):
-        print(f'make_ATL11xo_tiles.py --top_dir {args.top_dir} --dest_dir {args.dest_dir} --release {args.release} --version {args.version} --cycle {cycle} --region {args.region}')
+        print(f'make_ATL11xo_tiles.py --top_dir {args.top_dir} --dest_dir {args.dest_dir} --release {args.release} --version {args.version} --cycle {cycle} --region {args.region} --ref_cycles {args.ref_cycles[0]} {args.ref_cycles[1]}')
 
-def write_meta_fields(D, h5f):
+def write_meta_fields(D, h5f, ref_cycles, cycle):
     ''' Write the metadata fields to an hdf5 file handle '''
 
     g0=h5f.create_group('METADATA')
@@ -30,7 +30,9 @@ def write_meta_fields(D, h5f):
     g2.create_dataset('end_geoseg',data=np.array([np.nanmax(D.segment_id).astype(int)]))
     g2.create_dataset('start_rgt',data=np.array([np.nanmin(D.rgt).astype(int)]))
     g2.create_dataset('end_rgt',data=np.array([np.nanmax(D.rgt).astype(int)]))
-
+    h5f.attrs['ref_surf_cycles'] = ref_cycles
+    h5f.attrs['cycle'] = cycle
+    
 def main():
     parser=argparse.ArgumentParser(description='Generate a set of ATL11xo tiles from a directory of ATL11_atxo along-track crossover files')
     parser.add_argument('--top_dir', type=str, required=True, help='top directory containing ATL11_atxo files')
@@ -39,6 +41,7 @@ def main():
     parser.add_argument('--release', type=int, required=True, help='ATL11 release number')
     parser.add_argument('--version', type=int, required=True, help='ATL11xo version number')
     parser.add_argument('--cycle', type=int, required=True, help='cycle number')
+    parser.add_argument('--ref_cycles', type=int, nargs=2, required=True, help='first and last reference-track cycles included in the fit')
     parser.add_argument('--queue','-q', action="store_true", help='if set, a queue of commands will be ouput that make tiles for cycles 1...args.cycle')
     parser.add_argument('--region', type=str, required=True, help='region for output, AA=Antarctic, AR=Arctic')
     parser.add_argument('--tile_spacing', type=float, default=200000, help='tile spacing,  m')
@@ -119,17 +122,13 @@ def main():
                     D += [pc.data().from_h5(file, group=f'pt{pair}/{group}')]
                 except Exception:
                     pass
-        D=pc.data().from_list(D).get_xy(args.EPSG)
-        bins, bin_dict = tS.tile_xy(data=D, return_dict=True)
+        D=pc.data().from_list(D)
+        if group=='crossing_track':
+            Dxy = pc.data().from_dict({'latitude':D.latitude.copy(),
+                                       'longitude':D.longitude.copy(),
+                                       'delta_time':D.delta_time.copy()}).get_xy(args.EPSG) 
+            bins, bin_dict = tS.tile_xy(data=Dxy, return_dict=True)
         for xyT, ii in bin_dict.items():
-            if xyT not in D_root:
-                D_root[xyT]={}
-            Dsub=D[ii]
-            # make an index that sorts the data by floor(y/10k), then floor(x/10k), then delta_time
-            if xyT not in index_for_xyT:
-                index_for_xyT[xyT] = np.lexsort((Dsub.delta_time, np.floor(Dsub.x/1.e4), np.floor(Dsub.y/1.e4)))
-            Dsub = Dsub[index_for_xyT[xyT]]
-            Dsub.assign(xo_index=np.arange(0, Dsub.size, dtype=int))
             # choose the out file
             out_file = tS.tile_filename(xyT)
             if os.path.isfile(out_file) and group=='crossing_track' :
@@ -137,30 +136,47 @@ def main():
                 replace=True
             else:
                 replace=False
-
-            
-            if group=='ROOT':
+            if xyT not in D_root:
+                D_root[xyT]={}
+                
+            if  group=='ROOT':
+                # D_root will have already been populated
                 out_group='/'
                 Dsub=pc.data().from_dict(D_root[xyT])
             else:
                 out_group=group
+                # subset the data to the bin
+                Dsub=D[ii]
+                Dxy_sub = Dxy[ii]
+            
+                # make an index that sorts the data by floor(y/10k), then floor(x/10k), then delta_time
+                if xyT not in index_for_xyT:
+                    index_for_xyT[xyT] = np.lexsort((Dxy_sub.delta_time, np.floor(Dxy_sub.x/1.e4), np.floor(Dxy_sub.y/1.e4)))
+                # sort the data by the index
+                Dsub = Dsub[index_for_xyT[xyT]]
+                Dxy_sub = Dxy_sub[index_for_xyT[xyT]]
+                Dxy_sub.assign(xo_index=np.arange(0, Dxy_sub.size, dtype=int))
+
                 for field in Dsub.fields:
                     # some fields come from ref_track or crossing_track
                     # but need to be in ROOT
                     if field in group_attrs['ROOT']:
                         D_root[xyT][field] = getattr(Dsub, field)
                         Dsub.fields.remove(field)
-            
+                for field in ['latitude','longitude','x','y', 'xo_index']:
+                    if field not in D_root[xyT]:
+                        D_root[xyT][field] = getattr(Dxy_sub, field)
+
             # write the data
             Dsub.to_h5(out_file, group=out_group,
                        replace=replace,
                        meta_dict=group_attrs[group])
             with h5py.File(out_file,'a') as fh:
                 if group in group_descriptions:
-                    fh[group].attrs['description'.encode('ascii')] =\
+                    fh[out_group].attrs['description'.encode('ascii')] =\
                         group_descriptions[group].encode('ascii')
                 if group=='crossing_track':
-                    # this group contains delta_time segment and rgt
-                    write_meta_fields(Dsub, fh)
+                    # this group contains delta_time, segment, and rgt
+                    write_meta_fields(Dsub, fh, args.ref_cycles, args.cycle)
 if __name__=="__main__":
     main()
