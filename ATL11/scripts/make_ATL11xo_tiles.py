@@ -63,9 +63,11 @@ def main():
 
 
     tile_out_dir = os.path.join(args.dest_dir, f'cycle_{args.cycle:02d}')
-    if not os.path.isdir(tile_out_dir):
+    try:
         os.mkdir(tile_out_dir)
-
+    except FileExistsError:
+        pass
+    
     tS = pc.tilingSchema(mapping_function_name='floor', tile_spacing=args.tile_spacing, EPSG=args.EPSG,
                         format_str = f'ATL11xo_{args.region}_E%d_N%d_c{args.cycle:02d}_{args.release:03d}_{args.version:02d}')
     schema_file = os.path.join(tile_out_dir, f'{int(args.tile_spacing/1000)}km_tiling_{args.region}.json')
@@ -138,34 +140,33 @@ def main():
                 replace=False
             if xyT not in D_root:
                 D_root[xyT]={}
-                
+
             if  group=='ROOT':
                 # D_root will have already been populated
                 out_group='/'
+                Dxy_sub = Dxy[ii]
+                Dxy_sub = Dxy_sub[index_for_xyT[xyT]]
+                Dxy_sub.assign(xo_index=np.arange(0, Dxy_sub.size, dtype=int))
+                for field in ['latitude','longitude','x','y', 'xo_index']:
+                    if field not in D_root[xyT]:
+                        D_root[xyT][field] = getattr(Dxy_sub, field)
                 Dsub=pc.data().from_dict(D_root[xyT])
             else:
                 out_group=group
                 # subset the data to the bin
                 Dsub=D[ii]
-                Dxy_sub = Dxy[ii]
-            
+
                 # make an index that sorts the data by floor(y/10k), then floor(x/10k), then delta_time
                 if xyT not in index_for_xyT:
+                    Dxy_sub = Dxy[ii]
                     index_for_xyT[xyT] = np.lexsort((Dxy_sub.delta_time, np.floor(Dxy_sub.x/1.e4), np.floor(Dxy_sub.y/1.e4)))
                 # sort the data by the index
                 Dsub = Dsub[index_for_xyT[xyT]]
-                Dxy_sub = Dxy_sub[index_for_xyT[xyT]]
-                Dxy_sub.assign(xo_index=np.arange(0, Dxy_sub.size, dtype=int))
-
-                for field in Dsub.fields:
-                    # some fields come from ref_track or crossing_track
-                    # but need to be in ROOT
-                    if field in group_attrs['ROOT']:
+                # copy fields from this group to D_root as needed:
+                for field in group_attrs['ROOT']:
+                    if field in Dsub.fields and field not in Dxy.fields:
                         D_root[xyT][field] = getattr(Dsub, field)
                         Dsub.fields.remove(field)
-                for field in ['latitude','longitude','x','y', 'xo_index']:
-                    if field not in D_root[xyT]:
-                        D_root[xyT][field] = getattr(Dxy_sub, field)
 
             # write the data
             Dsub.to_h5(out_file, group=out_group,
