@@ -70,4 +70,3 @@ crossing_track_data,segment_id,counts,Nxo,int32,"The segment_id for the crossing
 crossing_track_data,beam_pair,counts,Nxo,int8,"The beam pair for the crossing data","crossover beam pair","ATL06",delta_time latitude longitude,1,6
 crossing_track_data,atl06_quality_summary,1,Nxo,int8,"Quality flag for the crossing data derived from ATL06.  0 indicates no problems detected, 1 indicates potential problems","crossover quality flag","ATL06",delta_time latitude longitude,0,31
 crossing_track_data,along_track_rss,meters,Nxo,Float32,"Root sum of the squared differences between the heights of the endpoints for the current segment and the centers of the previous and next segments","root sum of squared differences in crossover heights","derived, ATL11 algorithm",delta_time latitude longitude,0,
->>>>>>> ac69b57259f01e7096b3d3e54efaaa3f469592d8
