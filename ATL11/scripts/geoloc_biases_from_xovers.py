@@ -90,7 +90,7 @@ def filter_xovers(v, m, data,
 def collect_xovers(xover_glob, bin_size=100e3, DEM=None, min_h=1500, 
                         min_r = 250e3,max_r=2.5e6,
                         asc_minus_desc=None, max_delta_t=24*3600*10, 
-                        get_bins_only=False, get_data=False):
+                        get_bins_only=False, get_data=False, verbose=False):
     tile_re=re.compile('E(.*)_N(.*).h5')
         
     pad_0=np.arange(-bin_size/2, bin_size/2*1.25, bin_size/4)
@@ -100,6 +100,10 @@ def collect_xovers(xover_glob, bin_size=100e3, DEM=None, min_h=1500,
     for this_glob in xover_glob.split(' '):
         files += glob.glob(this_glob)
 
+
+    if verbose:
+        print(f"collect_xovers: for glob_str {xover_glob}, found {len(files)} files")
+        
     xys=[]
     for file in files:
         try:
@@ -113,7 +117,7 @@ def collect_xovers(xover_glob, bin_size=100e3, DEM=None, min_h=1500,
                 if np.all(np.sqrt((xy[0]+x_pad.ravel())**2+ (xy[1]+y_pad.ravel())**2)<min_r):
                     continue
             if max_r is not None:
-                if np.any(np.sqrt((xy[0]+x_pad.ravel())**2+ (xy[1]+y_pad.ravel())**2)>max_r):
+                if np.all(np.sqrt((xy[0]+x_pad.ravel())**2+ (xy[1]+y_pad.ravel())**2)>max_r):
                     continue
             xys += [xy]
             if get_bins_only:
@@ -252,8 +256,11 @@ def main():
     parser.add_argument('--r_range','-r', type=float, nargs=2, default=[100, 800], help="range of radii around the pole for which bin centers will be read, in km.")
     parser.add_argument('--min_h', type=float, default=1800, help="minimum DEM elevation for which to read crossover bins")
     parser.add_argument('--out_csv', type=str, required=True, help="output csv filename")
+    parser.add_argument('--verbose','-v', action="store_true")
     args=parser.parse_args()
 
+
+    print(args)
     min_r=args.r_range[0]*1000
     min_h=args.min_h
     max_r=args.r_range[1]*1000
@@ -264,7 +271,7 @@ def main():
     if args.DEM_file is not None:
         DEM=pc.grid.data().from_geotif(args.DEM_file)
 
-    v = collect_xovers(args.glob_str, DEM=DEM, max_delta_t = 2*bin_t_tol, min_r=min_r, min_h=min_h, max_r=max_r) 
+    v = collect_xovers(args.glob_str, DEM=DEM, max_delta_t = 2*bin_t_tol, min_r=min_r, min_h=min_h, max_r=max_r, verbose=args.verbose) 
 
     v.cycle_number=np.round(v.cycle_number).astype(int)
     v.rgt=np.round(v.rgt).astype(int)
