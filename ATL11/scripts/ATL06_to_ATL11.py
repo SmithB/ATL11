@@ -1,4 +1,4 @@
-#! /usr/bin/env python3 -u
+#! /usr/bin/env python3
 
 '''
 Executable script to generate ATL11 files based on ATL06 data.
@@ -16,11 +16,13 @@ import ATL11
 import time
 import glob
 import sys
-import matplotlib.pyplot as plt
+import os
+import hashlib
+import shutil
 import resource as memresource
 import json
 
-
+# example command-line arguments:
 #591 10 -F /Volumes/ice2/ben/scf/AA_06/001/cycle_02/ATL06_20190205041106_05910210_001_01.h5 -b -101. -76. -90. -74.5 -o test.h5 -G "/Volumes/ice2/ben/scf/AA_06/001/cycle*/index/GeoIndex.h5"
 #591 10 -F /Volumes/ice2/ben/scf/AA_06/001/cycle_02/ATL06_20190205041106_05910210_001_01.h5 -o test.h5 -G "/Volumes/ice2/ben/scf/AA_06/001/cycle*/index/GeoIndex.h5"
 
@@ -30,8 +32,9 @@ def get_proj4(hemisphere):
     if hemisphere==1:
         return '+proj=stere +lat_0=90 +lat_ts=70 +lon_0=-45 +k=1 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs '
 
-def main(argv):
-    # Tunable: 2000 sounds OK
+def main():
+    argv = sys.argv
+    # Tunable:
     BLOCKSIZE = 2000
     # account for a bug in argparse that misinterprets negative agruents
     for i, arg in enumerate(argv):
@@ -48,6 +51,7 @@ def main(argv):
     parser.add_argument('--Version','-V', type=int, default=1, help="Version number")
     parser.add_argument('--cycles', '-c', type=int, nargs=2, default=[3, 4], help="first and last cycles")
     parser.add_argument('--GI_file_glob','-G', type=str, default=None, help="Glob (wildcard) string used to match geoindex files for crossing tracks")
+    parser.add_argument('--tile_dir_glob', type=str, default=None, help="Glob (wildcard) string used to match directories containing tiled ATL06 data for crossing tracks")
     parser.add_argument('--out_dir','-o', default=None, required=True, help="Output directory")
     parser.add_argument('--first_point','-f', type=int, default=None, help="First reference point")
     parser.add_argument('--last_point','-l', type=int, default=None, help="Last reference point")
@@ -60,10 +64,13 @@ def main(argv):
     parser.add_argument('--use_hold_list',  action='store_true')
     parser.add_argument('--release_bias_file', type=str, help="json file specifying a bias value to be added to each spot in each data relase")
     parser.add_argument('--verbose','-v', action='store_true')
+    parser.add_argument('--scratch','-s', action='store_true')
     parser.add_argument('--sec_offset','-t', type=int, default=0, help="Seconds added to 00:00:00 of a rigid start date" [0])
+    parser.add_argument('--xover_output_dir', type=str, help="directory for crossover output")
     parser.add_argument('--start_date','-D', nargs='+', type=int, default=None, help="Start date, only for output metadata [YYYY DD MM]")
     args=parser.parse_args()
 
+    params_11=ATL11.defaults()
     # output file format is ATL11_RgtSubprod_c1c2_rel_vVer.h5
     out_file="%s/ATL11_%04d%02d_%02d%02d_%03d_%02d.h5" %( \
             args.out_dir,args.rgt, args.subproduct, args.cycles[0], \
@@ -79,10 +86,68 @@ def main(argv):
             exit(1)
     print(f'ATL06_to_ATL11.py: applying offset of {args.sec_offset} sec to start date {args.start_date}')
 
+
     glob_str='%s/*ATL06*_*_%04d??%02d_*.h5' % (args.directory, args.rgt, args.subproduct)
     files=glob.glob(glob_str)
     if args.verbose:
         print("found ATL06 files:" + str(files))
+# bpj, here, copy files to /scratch?
+    if args.scratch:
+        scratchpath = os.getenv('TSE_TMPDIR')
+#        print(scratchpath)
+        if scratchpath is not None:
+            goodcopy = np.empty(len(files), dtype=bool)
+            goodcopy.fill(0)
+#            print("0 goodcopy check:",goodcopy)
+
+            for file in files:
+                scratchfile = scratchpath+'/'+os.path.basename(file)
+                try:
+                    shutil.copyfile(file,scratchfile)
+                except:
+                    break
+                with open(file,"rb") as f:
+                    bytes = f.read()
+                    md5_source = hashlib.md5(bytes).hexdigest()
+                with open(scratchfile,"rb") as f:
+                    bytes = f.read()
+                    md5_scratch = hashlib.md5(bytes).hexdigest()
+                if md5_scratch == md5_source:
+                    goodcopy[list(not x for x in goodcopy).index(True)] = 1
+#            print('md5s:', md5_source,' ',md5_scratch)
+#            print("goodcopy check:",goodcopy)
+            if all(x for x in goodcopy):
+                files = [scratchpath+'/'+os.path.basename(file) for file in files]
+                print("ATL06 files duplicated to scratch ",scratchpath)
+#        print(files)
+#    exit()
+
+# Copy files to /scratch
+    if args.scratch:
+        scratchpath = os.getenv('TSE_TMPDIR')
+        print(scratchpath)
+        if scratchpath is not None:
+            goodcopy = np.empty(len(files), dtype=bool)
+            goodcopy.fill(0)
+
+            for file in files:
+                scratchfile = scratchpath+'/'+os.path.basename(file)
+                try:
+                    shutil.copyfile(file,scratchfile)
+                except:
+                    break
+                with open(file,"rb") as f:
+                    bytes = f.read()
+                    md5_source = hashlib.md5(bytes).hexdigest()
+                with open(scratchfile,"rb") as f:
+                    bytes = f.read()
+                    md5_scratch = hashlib.md5(bytes).hexdigest()
+                if md5_scratch == md5_source:
+                    goodcopy[list(not x for x in goodcopy).index(True)] = 1
+            if all(x for x in goodcopy):
+                files = [scratchpath+'/'+os.path.basename(file) for file in files]
+                if args.verbose:
+                  print("ATL06 files duplicated to scratch ",scratchpath)
 
     release_bias_dict=None
     if args.release_bias_file:
@@ -101,11 +166,24 @@ def main(argv):
     if args.verbose:
         print("found GI files:"+str(GI_files))
 
+    tile_dirs=None
+    if args.tile_dir_glob is not None:
+        tile_dirs = glob.glob(args.tile_dir_glob)
+    if args.verbose:
+        print("found tile dirs: " + str(tile_dirs))
+
+    if args.use_hold_list:
+        hold_list=ATL11.read_hold_files()
+    else:
+        hold_list=None
+
+    replace_xover_files=[True]
     for pair in pairs:
         # read the lat, lon, segment_id data for each segment
         D6_segdata = ATL11.read_ATL06_data(files, beam_pair=pair,
                                            cycles=args.cycles,
-                                           use_hold_list=args.use_hold_list,
+                                           hold_list=hold_list,
+                                           read_latlon = (args.bounds is not None),
                                            minimal=True)
         all_ref_pts=[]
         all_ref_pt_x=[]
@@ -123,7 +201,7 @@ def main(argv):
         # skip this pair if no ref points are found
         if len(all_ref_pts)==0:
             continue
-        all_ref_pts, ind =np.unique(np.concatenate(all_ref_pts), return_index=True)
+        all_ref_pts, ind =np.unique(np.concatenate(all_ref_pts).astype(int), return_index=True)
         all_ref_pt_x = np.concatenate(all_ref_pt_x)[ind]
 
         # loop over all segments in blocks of BLOCKSIZE
@@ -135,47 +213,49 @@ def main(argv):
 
         for block0 in blocks:
             ref_pt_range = [all_ref_pts[block0], all_ref_pts[np.minimum(len(all_ref_pts)-1, block0+BLOCKSIZE)]]
-            print(f'ref_pt_range={ref_pt_range}')
+            if args.verbose:
+                print(f'ref_pt_range={ref_pt_range}')
             seg_range=[np.maximum(0, ref_pt_range[0]-ATL11.defaults().N_search),
                        ref_pt_range[1]+ATL11.defaults().N_search]
-
             D6 = ATL11.read_ATL06_data(files, beam_pair=pair,
                                        cycles=args.cycles,
-                                       use_hold_list=args.use_hold_list,
+                                       hold_list=hold_list,
                                        ATL06_dict=D6_segdata, seg_range = seg_range )
+            if D6 is None:
+                continue
 
             atc_shift_table = ATL11.calc_geoloc_bias(D6,
                                     atc_shift_csv_file=args.xy_bias_file,
                                     atc_shift_table=atc_shift_table)
-
-            if D6 is None:
-                continue
-
+            # BUGFIX: changed "(all_ref_pts <= ref_pt_range[1])" to (all_ref_pts < ref_pt_range[1])
             ref_pt_ind=(all_ref_pts >= ref_pt_range[0]) & \
-                                   (all_ref_pts <= ref_pt_range[1])
+                                   (all_ref_pts < ref_pt_range[1])
             ref_pt_numbers=all_ref_pts[ref_pt_ind]
             ref_pt_x = all_ref_pt_x[ref_pt_ind]
 
             if len(ref_pt_numbers)==0:
                 continue
-            D11 += ATL11.data().from_ATL06(D6, ref_pt_numbers=ref_pt_numbers, ref_pt_x=ref_pt_x,\
+            # Performance improvement: set return_list to False.
+            D11i = ATL11.data().from_ATL06(D6, ref_pt_numbers=ref_pt_numbers, ref_pt_x=ref_pt_x,\
                                            cycles=args.cycles, \
                                            beam_pair=pair, \
                                            verbose=args.verbose, \
                                            GI_files=GI_files, \
+                                           tile_dirs=tile_dirs, \
                                            hemisphere=args.Hemisphere, \
                                            atc_shift_table=atc_shift_table,\
                                            release_bias_dict=release_bias_dict,\
                                            max_xover_latitude=args.max_xover_latitude,
-                                           return_list=True) # defined in ATL06_to_ATL11
-
-            print("completed %d/%d blocks, ref_pt = %d, last %d segments in %2.2f s." %(list(blocks).index(block0)+1, len(blocks), np.nanmax(D6.segment_id), BLOCKSIZE, time.time()-last_time))
-            print(f"memory: {memresource.getrusage(memresource.RUSAGE_SELF).ru_maxrss}")
+                                           hold_list=hold_list,
+                                           return_list=False)
+            if D11i is not None:
+                D11 += [D11i]
+            if args.verbose:
+                print("completed %d/%d blocks, ref_pt = %d, last %d segments in %2.2f s." %(list(blocks).index(block0)+1, len(blocks), np.nanmax(D6.segment_id), BLOCKSIZE, time.time()-last_time))
+                print(f"memory: {memresource.getrusage(memresource.RUSAGE_SELF).ru_maxrss}")
             last_time=time.time()
         if len(D11) > 0:
-            cycles=[np.nanmin([Pi.cycles for Pi in D11]), np.nanmax([Pi.cycles for Pi in D11])]
-            N_coeffs=np.nanmax([Pi.N_coeffs  for Pi in D11])
-            D11=ATL11.data(track_num=D11[0].rgt, beam_pair=pair, cycles=cycles, N_coeffs=N_coeffs).from_list(D11)
+            D11=ATL11.data(track_num=args.rgt, beam_pair=pair, cycles=args.cycles, N_coeffs=params_11.N_coeffs).from_list_of_ATL11_data(D11)
         else:
             D11=None
 
@@ -192,9 +272,21 @@ def main(argv):
             D11.Nxo = D11.crossing_track_data.h_corr.shape[0]
 
         if D11 is not None:
-            D11.write_to_file(out_file)
+            D11.write_to_file(out_file, write_xovers=False)
+            D11.write_xover_files(args, replace=replace_xover_files)
 
     out_file = ATL11.write_METADATA(out_file,args.sec_offset,args.start_date,files)
+
+    if args.scratch:
+      if all(x for x in goodcopy):
+          for file in files:
+              scratchfile = scratchpath+'/'+os.path.basename(file)
+              try:
+                os.remove(scratchfile)
+              except:
+                print('scratch file ',file,' already removed')
+          if args.verbose:
+            print("ATL06 files removed from scratch ",scratchpath)
 
     print("ATL06_to_ATL11: done with "+out_file)
 
@@ -203,4 +295,4 @@ def main(argv):
 #        ATL11.ATL11_browse_plots.ATL11_browse_plots(out_file,args.Hemispher,mosaic=mosaic)
 
 if __name__=="__main__":
-    main(sys.argv)
+    main()

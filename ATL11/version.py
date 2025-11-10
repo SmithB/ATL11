@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 
 def softwareVersion():
-    softwareVersion='1.0'
+    softwareVersion='3.0'
     return softwareVersion
 
 def softwareDate():
-    softwareDate='Nov 01 2020'
+    softwareDate='September 01 2025'
     return softwareDate
 
 def softwareTitle():
@@ -17,6 +17,5 @@ def identifier():
     return identifier
 
 def series_version():
-    series_version='1.0'
+    series_version='3.0'
     return series_version
-
