@@ -62,7 +62,6 @@ def main():
     parser.add_argument('--test_plot', action='store_true', help="plots locations, elevations, and elevation differences between cycles")
     parser.add_argument('--xy_bias_file', type=str, help="CSV file containing fields delta_time, x_bias, and y_bias")
     parser.add_argument('--use_hold_list',  action='store_true')
-    parser.add_argument('--release_bias_file', type=str, help="json file specifying a bias value to be added to each spot in each data relase")
     parser.add_argument('--verbose','-v', action='store_true')
     parser.add_argument('--scratch','-s', action='store_true')
     parser.add_argument('--sec_offset','-t', type=int, default=0, help="Seconds added to 00:00:00 of a rigid start date" [0])
@@ -149,22 +148,10 @@ def main():
                 if args.verbose:
                   print("ATL06 files duplicated to scratch ",scratchpath)
 
-    release_bias_dict=None
-    if args.release_bias_file:
-        with open(args.release_bias_file,'r') as fh:
-            release_bias_dict = json.load(fh)
-
     if args.pair is None:
         pairs=[1, 2, 3]
     else:
         pairs=[args.pair]
-
-    if args.GI_file_glob is not None:
-        GI_files=glob.glob(args.GI_file_glob)
-    else:
-        GI_files=None
-    if args.verbose:
-        print("found GI files:"+str(GI_files))
 
     tile_dirs=None
     if args.tile_dir_glob is not None:
@@ -240,11 +227,9 @@ def main():
                                            cycles=args.cycles, \
                                            beam_pair=pair, \
                                            verbose=args.verbose, \
-                                           GI_files=GI_files, \
                                            tile_dirs=tile_dirs, \
                                            hemisphere=args.Hemisphere, \
                                            atc_shift_table=atc_shift_table,\
-                                           release_bias_dict=release_bias_dict,\
                                            max_xover_latitude=args.max_xover_latitude,
                                            hold_list=hold_list,
                                            return_list=False)

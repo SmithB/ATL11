@@ -36,25 +36,35 @@ def get_ATL06_release(D6):
         D6i.assign({'release' : release})
 
 def get_xover_data(x0, y0, rgt, xover_cache, index_bin_size, params_11,
-                   GI_files=None,
                    tile_dirs=None,
-                   release_bias_dict=None,
+                   schemas = None,
                    hold_list=None,
-                   verbose=False, xy_bin=None):
-#                   GI_files=GI_files,
-#                   tile_dirs=tile_dirs,
+                   verbose=False,
+                   tile_size=1.e5
+                   xy_bin=None):
     """
     Read the data from other tracks.
 
     Maintain a cache of data so that subsequent reads don't have to reload data from disk
     Inputs:
-        x0, y0: bin centers
-        rgt: current rgt
-        GI_files: list of geograpic index files
-        tile_dirs: list of per-cycle atl06 tile dirs (specify if not specifying GI_files)
-        xover_cache: data cache (dict)
-        index_bin_size: size of the bins in the index
-        params_11: default parameter values for the ATL11 fit
+        x0, y0: iterables of floats, required
+            bin centers
+        rgt: float, required
+            current rgt
+        xover_cache: dict, required
+            data cache
+        index_bin_size: float, required
+            size of the bins in the index
+        params_11: ATL11.defaults, required
+            default parameter values for the ATL11 fit
+        tile_dirs: list, required
+            list of per-cycle atl06 tile dirs
+        tile_size: numeric, optional
+            size of tile files, default is 1.e5
+        schemas : dict, required
+            dictionary specifying a tiling schema for each tile directory
+        xy_bin : list, optional
+            list of fine-resolution bins that might contain crossover data
     """
 
     # identify the crossover centers
@@ -70,10 +80,15 @@ def get_xover_data(x0, y0, rgt, xover_cache, index_bin_size, params_11,
                     'BP',  'spot', 'LR',
                     'source_file_num']
 
-    if GI_files is not None:
-        tile_dirs = [os.path.dirname(thefile) for thefile in GI_files]
-    
-    dxb=1.e5
+    # update the tiling schemas
+    for thedir in tile_dirs:
+        if thedir in schemas:
+            continue
+        schemas[thedir] = pc.tilingSchema(directory=thedir,
+                                          tile_size=tile_size,
+                                          scale=1,
+                                          EPSG=params_11.EPSG)
+
     # update the crossover cache
     for x0_ctr in x0_ctrs:
         this_key=(np.real(x0_ctr), np.imag(x0_ctr))
@@ -85,25 +100,27 @@ def get_xover_data(x0, y0, rgt, xover_cache, index_bin_size, params_11,
             tile_data_list=[]
             if tile_dirs is not None:
                 for tile_dir in tile_dirs:
-                    tile_file = os.path.join(
-                        tile_dir,
-                        'E%d_N%d.h5' % (np.round(this_key[0]/dxb)*dxb, np.round(this_key[1]/dxb)*dxb))
-                    if not os.path.isfile(tile_file):
-                        continue
-                    new_data = pc.indexedH5.data(filename=tile_file)\
-                                .read([[jj] for jj in this_key],
-                                    fields=ATL06_fields)
-                    if new_data is None:
-                        continue
-                    if xy_bin is not None:
-                        subset_data_to_bins([new_data], xy_bin, EPSG=params_11.EPSG)
-                    tile_data_list += [new_data]
+                    # get the tile files from the schema for the current directory
+                    tile_files = schemas[tile_dir].filenames_for_xy(this_key)
+                    # we should have between zero and 4 files for each xy
+                    # (bins on edges can appear in multiple tiles)
+                    for tile_file in tile_files:
+                        if not os.path.isfile(tile_file):
+                            if verbose:
+                                print(f"{tile_file} does not exist")
+                            continue
+                        new_data = pc.indexedH5.data(filename=tile_file)\
+                                    .read([[jj] for jj in this_key],
+                                        fields=ATL06_fields)
+                        if new_data is None:
+                            continue
+                        if xy_bin is not None:
+                            subset_data_to_bins([new_data], xy_bin, EPSG=params_11.EPSG)
+                        tile_data_list += [new_data]
             if len(tile_data_list) == 0:
                 xover_cache[this_key]=None
                 continue
             temp=pc.data(fields=params_11.ATL06_xover_field_list).from_list(tile_data_list)
-            if release_bias_dict is not None:
-                apply_release_bias(temp, release_bias_dict)
             xover_cache[this_key]={'D':temp}
             # remove the current rgt from data in the cache
             temp.index(~np.in1d(xover_cache[this_key]['D'].rgt, [rgt]))
@@ -117,7 +134,7 @@ def get_xover_data(x0, y0, rgt, xover_cache, index_bin_size, params_11,
         # now read the data from the crossover cache
         if (xover_cache[this_key] is not None) and (xover_cache[this_key]['D'] is not None):
             try:
-                Q=xover_cache[this_key]['index'].query_xy([x0, y0], pad=1, get_data=False)
+                Q = xover_cache[this_key]['index'].query_xy([x0, y0], pad=1, get_data=False)
             except KeyError:
                 Q=None
             if Q is None:

@@ -705,10 +705,10 @@ class data(object):
         plt.xlim((np.nanmin(xx),  np.nanmax(xx)))
         return h
 
-    def from_ATL06(self, D6, GI_files=None, tile_dirs=None, beam_pair=1, cycles=[1, 12],\
+    def from_ATL06(self, D6, tile_dirs=None, beam_pair=1, cycles=[1, 12],\
                    ref_pt_numbers=None, ref_pt_x=None, hemisphere=-1,\
                    mission_time_bds=None, max_xover_latitude=90, \
-                   atc_shift_table=None, release_bias_dict=None,\
+                   atc_shift_table=None,\
                    hold_list=None,\
                    verbose=False, DOPLOT=None,DEBUG=None, return_list=True):
         """
@@ -719,8 +719,7 @@ class data(object):
             Required keyword inputs:
                 beam_pair: beam pair for the current fit (default=1)
                 cycles: cycles to be included in the current fit (default=2)
-                GI_files: list of geo_index file from which to read ATL06 data for crossovers
-                tile_dirs: directories in which to find ATL06 data for crossovers (specify only if not specifying GI_files)
+                tile_dirs: directories in which to find ATL06 data for crossovers
                 hemisphere: +1 (north) or -1 (south), used to choose a projection
             Optional keyword arguments (not necessarily independent)
                 max_xover_latitude: calculate crossovers for latitudes lower than this value
@@ -761,9 +760,7 @@ class data(object):
 
         D6_xyB = make_ATL06_xy_bins(D6, 100)
 
-        if release_bias_dict is not None:
-            ATL11.apply_release_bias(D6, release_bias_dict)
-
+        xover_tile_schemas={}
         for ref_pt, x_atc_ctr, i0, i1 in zip(ref_pt_numbers, ref_pt_x, start_segid, end_segid):
 
             # section 5.1.1
@@ -879,14 +876,13 @@ class data(object):
                                           ['geoid_free2mean'], ['x_atc', 'y_atc'],
                                           [x_atc_ctr,P11.y_atc_ctr])
             # get the data for the crossover point
-            if ((GI_files is not None) or (tile_dirs is not None)) and np.abs(P11.ROOT.latitude) < max_xover_latitude:
+            if tile_dirs is not None and np.abs(P11.ROOT.latitude) < max_xover_latitude:
                 D_xover=ATL11.get_xover_data(x0, y0, P11.rgt,
                                              D_xover_cache, index_bin_size, params_11,
                                              xy_bin=D6_xyB,
-                                             GI_files=GI_files,
                                              tile_dirs=tile_dirs,
-                                             release_bias_dict=release_bias_dict,
                                              hold_list=hold_list,
+                                             schemas=xover_tile_schemas,
                                              verbose=verbose)
                 P11.corr_xover_heights(D_xover, atc_shift_table=atc_shift_table)
             # if we have read any data for the current bin, run the crossover calculation
