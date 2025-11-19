@@ -9,7 +9,7 @@ import scipy.sparse as sp
 import ATL11
 import pandas as pd
 import argparse
-from ATL11.check_ATL06_hold_list import read_hold_files    
+from ATL11.check_ATL06_hold_list import read_hold_files
 
 def RDE(x):
     xs=x.copy()
@@ -76,12 +76,12 @@ def filter_xovers(v, m, data,
     #good &= m.grounded > grounded_tol
     if slope_max is not None:
         good &= np.all(np.abs(np.c_[v.dh_fit_dx, v.dh_fit_dy])< slope_max, axis=1)
-    
+
     if max_delta_t is not None:
         good &= (v.delta_t[:,1]-v.delta_t[:,0]) < max_delta_t
     if min_h is not None:
-        min_h &= (np.all(v.h_li > min_h, axis=1))
-    
+        good &= (np.all(v.h_li > min_h, axis=1))
+
     v.index(good)
     m.index(good)
     for di in data:
@@ -92,7 +92,7 @@ def collect_xovers(xover_glob, bin_size=100e3, DEM=None, min_h=1500,
                         asc_minus_desc=None, max_delta_t=24*3600*10, 
                         get_bins_only=False, get_data=False, verbose=False):
     tile_re=re.compile('E(.*)_N(.*).h5')
-        
+
     pad_0=np.arange(-bin_size/2, bin_size/2*1.25, bin_size/4)
     x_pad, y_pad = np.meshgrid(pad_0, pad_0)
     v, d, m, D0, D1 = [[], [], [], [], []]
@@ -100,10 +100,9 @@ def collect_xovers(xover_glob, bin_size=100e3, DEM=None, min_h=1500,
     for this_glob in xover_glob.split(' '):
         files += glob.glob(this_glob)
 
-
     if verbose:
         print(f"collect_xovers: for glob_str {xover_glob}, found {len(files)} files")
-        
+
     xys=[]
     for file in files:
         try:
@@ -124,9 +123,8 @@ def collect_xovers(xover_glob, bin_size=100e3, DEM=None, min_h=1500,
                 continue
             vv, mm, DD = read_xovers(file)
             filter_xovers(vv, mm, DD, min_h=min_h)
-            
+
             v += [vv]
-            
             if get_data:
                 D0 += [DD[0]]
                 D1 += [DD[1]]
@@ -326,14 +324,15 @@ def main():
     xy_sigma_u = np.c_[[oi['sigma_uncorr'] for oi in out_xy]]
     xy_sigma_c = np.c_[[oi['sigma_corr'] for oi in out_xy]]
     xy_sigma_d = np.c_[[oi['sigma_data'] for oi in out_xy]]
-
+    N_pts = np.c_[[len(oi['fit_index']) for oi in out_xy]]
     temp={'delta_time': xy_times}
     temp.update({'x_bias':x_biases,'y_bias':y_biases})
 
 
     temp.update({'total_sigma':xy_sigma_d,
                 'rgt_corr_sigma':xy_sigma_u,            
-                'xy_corr_sigma':xy_sigma_c})
+                 'xy_corr_sigma':xy_sigma_c,
+                 'N_pts':N_pts})
     for field in temp:
         temp[field]=temp[field].ravel()
     df=pd.DataFrame(temp)
