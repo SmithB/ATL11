@@ -40,7 +40,7 @@ def get_xover_data(x0, y0, rgt, xover_cache, index_bin_size, params_11,
                    schemas = None,
                    hold_list=None,
                    verbose=False,
-                   tile_size=1.e5
+                   tile_size=1.e5,
                    xy_bin=None):
     """
     Read the data from other tracks.
@@ -85,7 +85,7 @@ def get_xover_data(x0, y0, rgt, xover_cache, index_bin_size, params_11,
         if thedir in schemas:
             continue
         schemas[thedir] = pc.tilingSchema(directory=thedir,
-                                          tile_size=tile_size,
+                                          tile_spacing=tile_size,
                                           scale=1,
                                           EPSG=params_11.EPSG)
 
