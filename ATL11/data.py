@@ -551,9 +551,16 @@ class data(object):
                         'pair_track', 'fit_quality','dem_h','geoid_h',
                         'n_slope','e_slope','x_atc','y_atc'}
         for cycle, ind in d_cyc.items():
+            cycle_dir = os.path.join(args.xover_output_dir,f'cycle_{int(cycle[0]):02d}')
+            try:
+                os.mkdir(cycle_dir)
+            except FileExistsError:
+                pass
             this_out_file="%s/ATL11_atxo_%04d%02d_%02d_%03d_%02d.h5" %( \
-                args.xover_output_dir,args.rgt, args.subproduct, int(cycle[0]), \
+                cycle_dir, args.rgt, args.subproduct, int(cycle[0]), \
                 args.Release, args.Version)
+            if args.verbose:
+                print(f"writing xovers to {this_out_file}")
             # sort index by reference point
             ind=ind[np.argsort(ref.ref_pt[ind,0])]
             # write crossing track data
