@@ -5,6 +5,7 @@ import pointCollection as pc
 import glob
 import re
 import os
+import shutil
 import argparse
 import sys
 from importlib import resources
@@ -13,6 +14,8 @@ import h5py
 import uuid
 from ATL11.h5util import create_attribute
 
+atl11xo_template = str(resources.files('ATL11').joinpath("package_data/atl11xo_template.h5"))
+
 def make_queue(args):
     for cycle in range(1, args.cycle+1):
         print(f'make_ATL11xo_tiles.py --top_dir {args.top_dir} --dest_dir {args.dest_dir} --release {args.release} --version {args.version} --cycle {cycle} --region {args.region} --ref_cycles {args.ref_cycles[0]} {args.ref_cycles[1]}')
@@ -20,16 +23,24 @@ def make_queue(args):
 def write_meta_fields(D, h5f, ref_cycles, cycle):
     ''' Write the metadata fields to an hdf5 file handle '''
 
-    g0=h5f.create_group('METADATA')
-    g1=h5f.create_group('METADATA/DatasetIdentification')
-    create_attribute(g1.id, 'uuid', [], str(uuid.uuid4()))
-    g2 = h5f.create_group('ancillary_data')
-    g2.create_dataset('start_delta_time',data=np.array([np.nanmin(D.delta_time)]))
-    g2.create_dataset('end_delta_time',data=np.array([np.nanmax(D.delta_time)]))
-    g2.create_dataset('start_geoseg',data=np.array([np.nanmin(D.segment_id).astype(int)]))
-    g2.create_dataset('end_geoseg',data=np.array([np.nanmax(D.segment_id).astype(int)]))
-    g2.create_dataset('start_rgt',data=np.array([np.nanmin(D.rgt).astype(int)]))
-    g2.create_dataset('end_rgt',data=np.array([np.nanmax(D.rgt).astype(int)]))
+#    g0=h5f.create_group('METADATA')
+#    g1=h5f.create_group('METADATA/DatasetIdentification')
+#    create_attribute(g1.id, 'uuid', [], str(uuid.uuid4()))
+    create_attribute(h5f['METADATA/DatasetIdentification'].id, 'uuid', [], str(uuid.uuid4()))
+#    g2 = h5f.create_group('ancillary_data')
+    g2 = h5f['ancillary_data']
+    g2['start_delta_time'][...] = np.array([np.nanmin(D.delta_time)])
+    g2['end_delta_time'][...] = np.array([np.nanmax(D.delta_time)])
+    g2['start_geoseg'][...] = np.array([np.nanmin(D.segment_id).astype(int)])
+    g2['end_geoseg'][...] = np.array([np.nanmax(D.segment_id).astype(int)])
+    g2['start_rgt'][...] = np.array([np.nanmin(D.rgt).astype(int)])
+    g2['end_rgt'][...] = np.array([np.nanmax(D.rgt).astype(int)])
+#    g2.create_dataset('start_delta_time',data=np.array([np.nanmin(D.delta_time)]))
+#    g2.create_dataset('end_delta_time',data=np.array([np.nanmax(D.delta_time)]))
+#    g2.create_dataset('start_geoseg',data=np.array([np.nanmin(D.segment_id).astype(int)]))
+#    g2.create_dataset('end_geoseg',data=np.array([np.nanmax(D.segment_id).astype(int)]))
+#    g2.create_dataset('start_rgt',data=np.array([np.nanmin(D.rgt).astype(int)]))
+#    g2.create_dataset('end_rgt',data=np.array([np.nanmax(D.rgt).astype(int)]))
     h5f.attrs['ref_surf_cycles'] = ref_cycles
     h5f.attrs['cycle'] = cycle
 
@@ -133,11 +144,30 @@ def main():
         for xyT, ii in bin_dict.items():
             # choose the out file
             out_file = tS.tile_filename(xyT)
+            # If starting new file, copy template (replace=False to avoid overwrite)
             if os.path.isfile(out_file) and group=='crossing_track' :
                 os.remove(out_file)
-                replace=True
+                try:
+                    shutil.copyfile(atl11xo_template, out_file)
+                except PermissionError:
+                    print("Error: Permission denied. Cannot write to {out_file}.")
+                except FileNotFoundError:
+                    print(f"Error: Template file not found at {atl11xo_template}.")
+                except shutil.SpecialFileError:
+                    print("Error: Cannot copy special file types (e.g., named pipes).")
+                except shutil.Error as e:
+                    print(f"Error during template copy operation to {out_file}: {e}")
+                except Exception as e:
+                    print(f'Error: {e} Failed to copy template to {out_file}')
+                replace=False
             else:
                 replace=False
+
+#            if os.path.isfile(out_file) and group=='crossing_track' :
+#                os.remove(out_file)
+#                replace=True
+#            else:
+#                replace=False
             if xyT not in D_root:
                 D_root[xyT]={}
 
