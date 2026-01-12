@@ -32,7 +32,7 @@ def write_meta_fields(D, h5f, ref_cycles, cycle):
     g2.create_dataset('end_rgt',data=np.array([np.nanmax(D.rgt).astype(int)]))
     h5f.attrs['ref_surf_cycles'] = ref_cycles
     h5f.attrs['cycle'] = cycle
-    
+
 def main():
     parser=argparse.ArgumentParser(description='Generate a set of ATL11xo tiles from a directory of ATL11_atxo along-track crossover files')
     parser.add_argument('--top_dir', type=str, required=True, help='top directory containing ATL11_atxo files')
@@ -67,7 +67,7 @@ def main():
         os.mkdir(tile_out_dir)
     except FileExistsError:
         pass
-    
+
     tS = pc.tilingSchema(mapping_function_name='floor', tile_spacing=args.tile_spacing, EPSG=args.EPSG,
                         format_str = f'ATL11xo_{args.region}_E%d_N%d_c{args.cycle:02d}_{args.release:03d}_{args.version:02d}')
     schema_file = os.path.join(tile_out_dir, f'{int(args.tile_spacing/1000)}km_tiling_{args.region}.json')
@@ -129,7 +129,7 @@ def main():
             Dxy = pc.data().from_dict({'latitude':D.latitude.copy(),
                                        'longitude':D.longitude.copy(),
                                        'delta_time':D.delta_time.copy()}).get_xy(args.EPSG) 
-            bins, bin_dict = tS.tile_xy(data=Dxy, return_dict=True)
+            bin_dict = tS.tile_xy(data=Dxy, return_dict=True)
         for xyT, ii in bin_dict.items():
             # choose the out file
             out_file = tS.tile_filename(xyT)
