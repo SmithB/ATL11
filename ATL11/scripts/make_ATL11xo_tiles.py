@@ -44,6 +44,50 @@ def write_meta_fields(D, h5f, ref_cycles, cycle):
     h5f.attrs['ref_surf_cycles'] = ref_cycles
     h5f.attrs['cycle'] = cycle
 
+def parse_attr_file():
+    # read in the metadata
+    attrfile=os.path.join(str(resources.files('ATL11')), 'package_data', 'ATL11xo_output_attrs.csv')
+    all_field_attrs=list(csv.DictReader(open(attrfile, encoding='utf-8-sig')))
+
+    group_attrs={}
+    group_descriptions={}
+
+    # make a dictionary listing attributes for each group
+    for field_attrs in all_field_attrs:
+        group_name = field_attrs['group']
+        if len(group_name)==0:
+            # blank line
+            continue
+        if group_name not in group_attrs:
+            group_attrs[group_name] = {}
+        this_group = group_attrs[group_name]
+        field = field_attrs['field']
+        if len(field) == 0:
+            # zero-length field indicates a group description
+            group_descriptions[group_name] = field_attrs['description']
+            continue
+        if field not in this_group:
+            this_group[field] = {}
+        for attr, val in field_attrs.items():
+            if attr in ['field','group']:
+                continue
+
+            #'valid_min' and 'valid_max' fields are numeric
+            if 'valid_m' in attr:
+                # make sure valid_max and valid_min match the variable's datatype
+                if val == '':
+                    continue
+                this_group[field][attr] = np.dtype(field_attrs['datatype'].lower()).type(val)
+            else:
+                # otherwise write a string
+                this_group[field][attr] = str(val)
+        if field_attrs['datatype'].startswith('int'):
+            field_attrs['fill_value'] = np.iinfo(np.dtype(field_attrs['datatype'])).max
+        elif field_attrs['datatype'].startswith('float'):
+            field_attrs['fill_value'] = np.finfo(np.dtype(field_attrs['datatype'])).max
+    return group_attrs, group_descriptions
+
+
 def main():
     parser=argparse.ArgumentParser(description='Generate a set of ATL11xo tiles from a directory of ATL11_atxo along-track crossover files')
     parser.add_argument('--top_dir', type=str, required=True, help='top directory containing ATL11_atxo files')
@@ -86,43 +130,7 @@ def main():
         tS.to_json(schema_file)
     tS.directory=tile_out_dir
 
-    # read in the metadata
-    attrfile=os.path.join(str(resources.files('ATL11')), 'package_data', 'ATL11xo_output_attrs.csv')
-    all_field_attrs=list(csv.DictReader(open(attrfile, encoding='utf-8-sig')))
-
-    group_attrs={}
-    group_descriptions={}
-
-    # make a dictionary listing attributes for each group
-    for field_attrs in all_field_attrs:
-        group_name = field_attrs['group']
-        if len(group_name)==0:
-            # blank line
-            continue
-        if group_name not in group_attrs:
-            group_attrs[group_name] = {}
-        this_group = group_attrs[group_name]
-        field = field_attrs['field']
-        if len(field) == 0:
-            # zero-length field indicates a group description
-            group_descriptions[group_name] = field_attrs['description']
-            continue
-        if field not in this_group:
-            this_group[field] = {}
-        for attr, val in field_attrs.items():
-            if attr in ['field','group']:
-                continue
-
-            #'valid_min' and 'valid_max' fields are numeric
-            if 'valid_m' in attr:
-                # make sure valid_max and valid_min match the variable's datatype
-                if val == '':
-                    continue
-                this_group[field][attr] = np.dtype(field_attrs['datatype'].lower()).type(val)
-            else:
-                # otherwise write a string
-                this_group[field][attr] = str(val)
-
+    group_attrs, group_descriptions = parse_attr_file()
 
     replace=True
     index_for_xyT = {}
@@ -139,7 +147,7 @@ def main():
         if group=='crossing_track':
             Dxy = pc.data().from_dict({'latitude':D.latitude.copy(),
                                        'longitude':D.longitude.copy(),
-                                       'delta_time':D.delta_time.copy()}).get_xy(args.EPSG) 
+                                       'delta_time':D.delta_time.copy()}).get_xy(args.EPSG)
             bin_dict = tS.tile_xy(data=Dxy, return_dict=True)
         for xyT, ii in bin_dict.items():
             # choose the out file
@@ -153,8 +161,6 @@ def main():
                     print("Error: Permission denied. Cannot write to {out_file}.")
                 except FileNotFoundError:
                     print(f"Error: Template file not found at {atl11xo_template}.")
-                except shutil.SpecialFileError:
-                    print("Error: Cannot copy special file types (e.g., named pipes).")
                 except shutil.Error as e:
                     print(f"Error during template copy operation to {out_file}: {e}")
                 except Exception as e:
@@ -163,11 +169,6 @@ def main():
             else:
                 replace=False
 
-#            if os.path.isfile(out_file) and group=='crossing_track' :
-#                os.remove(out_file)
-#                replace=True
-#            else:
-#                replace=False
             if xyT not in D_root:
                 D_root[xyT]={}
 
