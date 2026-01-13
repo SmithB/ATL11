@@ -81,10 +81,10 @@ def parse_attr_file():
             else:
                 # otherwise write a string
                 this_group[field][attr] = str(val)
-        if field_attrs['datatype'].startswith('int'):
-            field_attrs['fill_value'] = np.iinfo(np.dtype(field_attrs['datatype'])).max
+        if field_attrs['datatype'].startswith('int'):q
+            field_attrs['_FillValue'] = np.iinfo(np.dtype(field_attrs['datatype'])).max
         elif field_attrs['datatype'].startswith('float'):
-            field_attrs['fill_value'] = np.finfo(np.dtype(field_attrs['datatype'])).max
+            field_attrs['_FillValue'] = np.finfo(np.dtype(field_attrs['datatype'])).max
     return group_attrs, group_descriptions
 
 
@@ -201,8 +201,8 @@ def main():
 
             # write the data
             Dsub.to_h5(out_file, group=out_group,
-                       replace=replace,
-                       meta_dict=group_attrs[group])
+                       replace = replace,
+                       meta_dict = group_attrs[group])
             with h5py.File(out_file,'a') as fh:
                 if group in group_descriptions:
                     fh[out_group].attrs['description'.encode('ascii')] =\
