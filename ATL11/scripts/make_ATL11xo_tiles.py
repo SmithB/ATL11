@@ -51,7 +51,7 @@ def parse_attr_file():
 
     group_attrs={}
     group_descriptions={}
-
+    group_dimensions={}
     # make a dictionary listing attributes for each group
     for field_attrs in all_field_attrs:
         group_name = field_attrs['group']
@@ -60,7 +60,9 @@ def parse_attr_file():
             continue
         if group_name not in group_attrs:
             group_attrs[group_name] = {}
+            group_dimensions[group_name] = {}
         this_group = group_attrs[group_name]
+        this_dimensions = group_dimensions[group_name]
         field = field_attrs['field']
         if len(field) == 0:
             # zero-length field indicates a group description
@@ -68,10 +70,18 @@ def parse_attr_file():
             continue
         if field not in this_group:
             this_group[field] = {}
+            this_dimensions[field] = {}
         for attr, val in field_attrs.items():
             if attr in ['field','group']:
                 continue
-
+            if attr == 'dimension':
+                # boolean flag to tell us whether a field is a dimension
+                val = val in ['yes','YES','True', 'true','TRUE', 1]
+                group_dimensions[group_name][field]['dimension'] = val
+                continue
+            if attr == 'dimensions':
+                group_dimensions[group_name][field]['dimensions'] = val
+                continue
             #'valid_min' and 'valid_max' fields are numeric
             if 'valid_m' in attr:
                 # make sure valid_max and valid_min match the variable's datatype
@@ -81,12 +91,56 @@ def parse_attr_file():
             else:
                 # otherwise write a string
                 this_group[field][attr] = str(val)
-        if field_attrs['datatype'].startswith('int'):q
+        if field_attrs['datatype'].startswith('int'):
             field_attrs['_FillValue'] = np.iinfo(np.dtype(field_attrs['datatype'])).max
         elif field_attrs['datatype'].startswith('float'):
             field_attrs['_FillValue'] = np.finfo(np.dtype(field_attrs['datatype'])).max
-    return group_attrs, group_descriptions
+    return group_attrs, group_descriptions, group_dimensions
 
+def make_dimensions(out_file, group_dimensions):
+    with h5py.File(out_file,'a') as h5f:
+        # first make the dimension(s)
+        for group_key in ['ROOT','datum_track','crossing_track']:
+            if group_key=='ROOT':
+                dst=h5f
+            else:
+                dst=h5f[group_key]
+            for field, dim_dict in group_dimensions[group_key].items():
+                if not dim_dict['dimension']:
+                    continue
+                dst[field].make_scale()
+        # next attach the dimensions to the variables:
+        for group_key in ['ROOT','datum_track','crossing_track']:
+            if group_key=='ROOT':
+                dst=h5f
+                group=''
+            else:
+                dst=h5f[group_key]
+                group=group_key
+            for field, dim_dict in group_dimensions[group_key].items():
+                if dim_dict['dimension']:
+                    continue
+                dims = dim_dict['dimensions']
+                if isinstance(dims, str):
+                    dims = dims.split(',')
+                dset = dst[field]
+                for ind, dim in enumerate(dims):
+                    if '../' in dim:
+                        group_path = group.split('/')
+                        while '../' in dim:
+                            dim=dim.lstrip('../')
+                            group_path=group_path[:-1]
+                        try:
+                            dset.dims[ind].attach_scale(h5f["/"+'/'.join(group_path+[dim])])
+                        except Exception as e:
+                            print("-----")
+                            print([group,field])
+                            print('/'.join(group_path+[dim]))
+                            print("------")
+                            raise e
+                    else:
+                        dset.dims[ind].attach_scale(h5f[dim])
+                    dset.dims[ind].label=dim
 
 def main():
     parser=argparse.ArgumentParser(description='Generate a set of ATL11xo tiles from a directory of ATL11_atxo along-track crossover files')
@@ -130,11 +184,12 @@ def main():
         tS.to_json(schema_file)
     tS.directory=tile_out_dir
 
-    group_attrs, group_descriptions = parse_attr_file()
+    group_attrs, group_descriptions, group_dimensions = parse_attr_file()
 
     replace=True
     index_for_xyT = {}
     D_root = {}
+    files_list=[]
     for group in ['crossing_track', 'datum_track','ROOT']:
         D=[]
         for file in glob.glob(args.top_dir+f'/ATL11_atxo*_*_{args.cycle:02d}_*.h5')[:args.max_files]:
@@ -152,6 +207,8 @@ def main():
         for xyT, ii in bin_dict.items():
             # choose the out file
             out_file = tS.tile_filename(xyT)
+            if out_file not in files_list:
+                files_list.append(out_file)
             # If starting new file, copy template (replace=False to avoid overwrite)
             if os.path.isfile(out_file) and group=='crossing_track' :
                 os.remove(out_file)
@@ -210,5 +267,8 @@ def main():
                 if group=='crossing_track':
                     # this group contains delta_time, segment, and rgt
                     write_meta_fields(Dsub, fh, args.ref_cycles, args.cycle)
+    # setup dimensions:
+    for out_file in files_list:
+        make_dimensions(out_file, group_dimensions)
 if __name__=="__main__":
     main()
