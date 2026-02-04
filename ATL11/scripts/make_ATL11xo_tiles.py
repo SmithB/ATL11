@@ -294,7 +294,7 @@ def main():
         for file in glob.glob(args.top_dir+f'/cycle_{args.cycle:02d}/ATL11_atxo*_{args.cycle:02d}_*_*.h5')[:args.max_files]:
             for pair in [1, 2, 3]:
                 try:
-                    D += [pc.data().from_h5(file, group=f'pt{pair}/{group}')]
+                    D += [ATL11xo.data().from_h5(file, group=f'pt{pair}/{group}')]
                 except Exception:
                     pass
         # D is all the data from the input group
