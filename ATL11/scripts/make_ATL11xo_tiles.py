@@ -8,12 +8,14 @@ import os
 import shutil
 import argparse
 import sys
+from datetime import datetime, timedelta, timezone
 from importlib import resources
 import csv
 import h5py
 import uuid
 from ATL11.h5util import create_attribute
 from ATL11 import ATL11xo
+from ATL11.version import xosoftwareVersion,xosoftwareDate,xosoftwareTitle,xoidentifier,xoseries_version
 
 def make_queue(args):
 
@@ -23,14 +25,75 @@ def make_queue(args):
 def write_meta_fields(D, h5f, ref_cycles, cycle):
     ''' Write the metadata fields to an hdf5 file handle '''
 
+    maxlon = h5f['/'].attrs['geospatial_lon_max']
+    minlon = h5f['/'].attrs['geospatial_lon_min']
+    if minlon*maxlon < 0 and maxlon > 150.0:
+        eastlon = minlon
+        westlon = maxlon
+    else:
+        eastlon = maxlon
+        westlon = minlon
+    h5f['METADATA/Extent'].attrs['eastBoundLongitude'] = eastlon
+    h5f['METADATA/Extent'].attrs['westBoundLongitude'] = westlon
+    h5f['METADATA/Extent'].attrs['northBoundLatitude'] = h5f['/'].attrs['geospatial_lat_max']
+    h5f['METADATA/Extent'].attrs['southBoundLatitude'] = h5f['/'].attrs['geospatial_lat_min']
+    create_attribute(h5f['/'].id, 'identifier_file_uuid', [], str(uuid.uuid4()))
+    create_attribute(h5f['/'].id, 'date_created', [], str(datetime.now().date())+'T'+str(datetime.now().time())+'Z')
+    create_attribute(h5f['/'].id, 'history', [], str(datetime.now().date())+'T'+str(datetime.now().time())+'Z')
+    create_attribute(h5f['/'].id, 'hdfversion', [], str(h5py.version.hdf5_version))
+    create_attribute(h5f.id, 'identifier_product_format_version', [], xosoftwareVersion())
+
     create_attribute(h5f['METADATA/DatasetIdentification'].id, 'uuid', [], str(uuid.uuid4()))
+    create_attribute(h5f['METADATA/DatasetIdentification'].id, 'creationDate', [], str(datetime.now().date())+'T'+str(datetime.now().time())+'Z')
+    create_attribute(h5f['METADATA/DatasetIdentification'].id, 'fileName', [], str(os.path.basename(h5f.filename)))
+    create_attribute(h5f['METADATA/DatasetIdentification'].id, 'VersionID', [], xosoftwareVersion())
+    create_attribute(h5f['METADATA/Lineage/Control'].id, 'control', [], ' '.join(sys.argv))
+    create_attribute(h5f['METADATA/Lineage/Control'].id, 'description', [], 'Exact command line execution of ICESat-2/ATL11 algorithm providing all of the conditions required for each individual run of the software.')
+    create_attribute(h5f['METADATA/Lineage/Control'].id, 'shortName', [], 'CNTL')
+    create_attribute(h5f['METADATA/Lineage/Control'].id, 'version', [], '1')
+
+    create_attribute(h5f['METADATA/Lineage/Control'].id, 'control', [], ' '.join(sys.argv))
+    create_attribute(h5f['METADATA/SeriesIdentification'].id, 'VersionID', [], xoseries_version())
+
+    create_attribute(h5f['METADATA/ProcessStep/PGE'].id, 'stepDateTime', [], str(datetime.now().date())+'T'+str(datetime.now().time())+'Z')
+    create_attribute(h5f['METADATA/ProcessStep/PGE'].id, 'softwareVersion', [], xosoftwareVersion())
+    create_attribute(h5f['METADATA/ProcessStep/PGE'].id, 'runTimeParameters', [], ' '.join(sys.argv))
+    create_attribute(h5f['METADATA/ProcessStep/PGE'].id, 'identifier', [], xoidentifier())
+    create_attribute(h5f['METADATA/ProcessStep/PGE'].id, 'softwareDate', [], xosoftwareDate())
+    create_attribute(h5f['METADATA/ProcessStep/PGE'].id, 'softwareTitle', [], xosoftwareTitle())
+
     g2 = h5f['ancillary_data']
+    g2['atlas_sdp_gps_epoch'][...] = np.array([1198800018.], dtype=np.float64)
     g2['start_delta_time'][...] = np.array([np.nanmin(D.delta_time)])
     g2['end_delta_time'][...] = np.array([np.nanmax(D.delta_time)])
     g2['start_geoseg'][...] = np.array([np.nanmin(D.segment_id).astype(int)])
     g2['end_geoseg'][...] = np.array([np.nanmax(D.segment_id).astype(int)])
     g2['start_rgt'][...] = np.array([np.nanmin(D.rgt).astype(int)])
     g2['end_rgt'][...] = np.array([np.nanmax(D.rgt).astype(int)])
+    ctl = h5f['METADATA']['Lineage']['Control'].attrs['control'].decode()
+    g2['control'][...] = ctl.encode('ASCII','replace')
+    g2['release'][...] = os.path.basename(h5f.filename).split('_')[-2].encode('ASCII','replace')
+    g2['version'][...] = os.path.splitext(os.path.basename(h5f.filename))[0].split('_')[-1].encode('ASCII','replace')
+
+    epoch = datetime(2018, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+    start_delta_time = timedelta(seconds=np.array([np.nanmin(D.delta_time)])[0])
+    start_utc_time = epoch + start_delta_time
+    str_start_utc = (str(start_utc_time.date())+'T'+
+                    start_utc_time.strftime("%H:%M:%S.%f")+'Z')
+    end_delta_time = timedelta(seconds=np.array([np.nanmax(D.delta_time)])[0])
+    end_utc_time = epoch + end_delta_time
+    str_end_utc = (str(end_utc_time.date())+'T'+
+                    end_utc_time.strftime("%H:%M:%S.%f")+'Z')
+    create_attribute(h5f['/'].id, 'time_coverage_start', [], str_start_utc)
+    create_attribute(h5f['/'].id, 'time_coverage_end', [], str_end_utc)
+    h5f['/'].attrs['time_coverage_duration'] = np.array([np.nanmax(D.delta_time)])[0] - np.array([np.nanmin(D.delta_time)])[0]
+    g2['data_start_utc'][...] = str_start_utc.encode('ASCII','replace')
+    g2['granule_start_utc'][...] = str_start_utc.encode('ASCII','replace')
+    g2['data_end_utc'][...] = str_end_utc.encode('ASCII','replace')
+    g2['granule_end_utc'][...] = str_end_utc.encode('ASCII','replace')
+    create_attribute(h5f['METADATA/Extent'].id, 'rangeBeginningDateTime', [], str_start_utc)
+    create_attribute(h5f['METADATA/Extent'].id, 'rangeEndingDateTime', [], str_end_utc)
+
     h5f.attrs['ref_surf_cycles'] = ref_cycles
     h5f.attrs['cycle'] = cycle
 
@@ -150,6 +213,8 @@ def write_data(out_file, xyT, D_cache, args, group_attrs, group_descriptions, gr
         print(f'Error: {e} Failed to copy template to {out_file}')
     # write the data
     with h5py.File(out_file,'a') as fh:
+    # Clean up group not needed
+        del fh['orbit_info']
         for group in ['ROOT','datum_track','crossing_track']:
             out_group = '/' if group=='ROOT' else group
             Dsub = D_cache[group][xyT]
@@ -172,7 +237,7 @@ def write_data(out_file, xyT, D_cache, args, group_attrs, group_descriptions, gr
                 fh.attrs['geospatial_lon_max'] = np.nanmax(Dsub.longitude)
                 fh.attrs['geospatial_lat_min'] = np.nanmin(Dsub.latitude)
                 fh.attrs['geospatial_lat_max'] = np.nanmax(Dsub.latitude)
-                fh.attrs['geospatial_ellipsoid'] = 'WGS84'
+                create_attribute(fh['/'].id, 'geospatial_ellipsoid', [], 'WGS84')
 
         make_dimensions(fh, group_dimensions)
 
