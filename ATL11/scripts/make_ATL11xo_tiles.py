@@ -13,9 +13,10 @@ import csv
 import h5py
 import uuid
 from ATL11.h5util import create_attribute
+from ATL11 import ATL11xo
 
 def make_queue(args):
-    
+
     for cycle in range(1, args.cycle+1):
         print(f'make_ATL11xo_tiles.py --top_dir {args.top_dir} --dest_dir {args.dest_dir} --release {args.release} --version {args.version} --cycle {cycle} --region {args.region} --ref_cycles {args.ref_cycles[0]} {args.ref_cycles[1]}')
 
@@ -232,10 +233,10 @@ def main():
                 except Exception:
                     pass
         # D is all the data from the input group
-        D=pc.data().from_list(D)
+        D = ATL11xo.data().from_list(D)
         if group=='crossing_track':
             # Dxy is the location data (stored in crossing_track)
-            Dxy = pc.data().from_dict({'latitude':D.latitude.copy(),
+            Dxy = ATL11xo.data().from_dict({'latitude':D.latitude.copy(),
                                        'longitude':D.longitude.copy(),
                                        'delta_time':D.delta_time.copy()}).get_xy(args.EPSG)
             # bin_dict is the spatial index for the data
@@ -254,7 +255,7 @@ def main():
                 for field in ['latitude','longitude','x','y', 'xo_index']:
                     if field not in D_cache['ROOT'][xyT]:
                         D_cache['ROOT'][xyT][field] = getattr(Dxy_sub, field)
-                D_cache[group][xyT] = pc.data().from_dict(D_cache['ROOT'][xyT])
+                D_cache[group][xyT] = ATL11xo.data().from_dict(D_cache['ROOT'][xyT])
             else:
                 # subset the data to the bin
                 Dsub=D[ii]
