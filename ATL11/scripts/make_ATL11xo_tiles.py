@@ -13,6 +13,7 @@ from importlib import resources
 import csv
 import h5py
 import uuid
+from ATL11 import ATL11xo
 from ATL11.h5util import create_attribute
 from ATL11.version import xosoftwareVersion, xosoftwareDate, xosoftwareTitle, xoidentifier, xoseries_version
 
@@ -296,14 +297,14 @@ def main():
         for file in glob.glob(args.top_dir+f'/cycle_{args.cycle:02d}/ATL11_atxo*_{args.cycle:02d}_*_*.h5')[:args.max_files]:
             for pair in [1, 2, 3]:
                 try:
-                    D += [pc.data().from_h5(file, group=f'pt{pair}/{group}')]
+                    D += [ATL11xo.data().from_h5(file, group=f'pt{pair}/{group}')]
                 except Exception:
                     pass
         # D is all the data from the input group
-        D = pc.data().from_list(D)
+        D = ATL11xo.data().from_list(D)
         if group=='crossing_track':
             # Dxy is the location data (stored in crossing_track)
-            Dxy = pc.data().from_dict({'latitude':D.latitude.copy(),
+            Dxy = ATL11xo.data().from_dict({'latitude':D.latitude.copy(),
                                        'longitude':D.longitude.copy(),
                                        'delta_time':D.delta_time.copy()}).get_xy(args.EPSG)
             # bin_dict is the spatial index for the data
@@ -322,7 +323,7 @@ def main():
                 for field in ['latitude','longitude','x','y', 'xo_index']:
                     if field not in D_cache['ROOT'][xyT]:
                         D_cache['ROOT'][xyT][field] = getattr(Dxy_sub, field)
-                D_cache[group][xyT] = pc.data().from_dict(D_cache['ROOT'][xyT])
+                D_cache[group][xyT] = ATL11xo.data().from_dict(D_cache['ROOT'][xyT])
             else:
                 # subset the data to the bin
                 Dsub=D[ii]
