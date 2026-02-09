@@ -16,7 +16,7 @@ import uuid
 import subprocess
 from ATL11.h5util import create_attribute
 from ATL11 import ATL11xo
-from ATL11.version import xosoftwareVersion,xosoftwareDate,xosoftwareTitle,xoidentifier,xoseries_version
+from ATL11.version import xosoftwareVersion, xosoftwareDate, xosoftwareTitle, xoidentifier, xoseries_version
 
 def make_queue(args):
 
@@ -225,14 +225,17 @@ def write_data(out_file, xyT, D_cache, args, group_attrs, group_descriptions, gr
                        replace = False,
                        meta_dict = group_attrs[group])
             if group in group_descriptions:
-                fh[out_group].attrs['description'.encode('ascii')] =\
-                    group_descriptions[group].encode('ascii')
+                create_attribute(fh[out_group].id, 'description', [], group_descriptions[group])
+                #fh[out_group].attrs['description'.encode('ascii')] =\
+                #    group_descriptions[group].encode('ascii')
             if group=='crossing_track':
                 # this group contains delta_time, segment, and rgt
                 write_meta_fields(Dsub, fh, args.ref_cycles, args.cycle)
             if 'delta_time' in fh[out_group]:
-                fh[out_group]['delta_time'].attrs['standard_name'] = 'time'
-                fh[out_group]['delta_time'].attrs['calendar'] = 'standard'
+                create_attribute(fh[out_group]['delta_time'].id, 'standard_name', [], 'time')
+                create_attribute(fh[out_group]['delta_time'].id, 'calendar', [], 'standard')
+                #fh[out_group]['delta_time'].attrs['standard_name'] = 'time'
+                #fh[out_group]['delta_time'].attrs['calendar'] = 'standard'
             if group=='ROOT':
                 # do this for the last group written
                 fh.attrs['geospatial_lon_min'] = np.nanmin(Dsub.longitude)
@@ -332,7 +335,7 @@ def main():
         for file in glob.glob(args.top_dir+f'/cycle_{args.cycle:02d}/ATL11_atxo*_{args.cycle:02d}_*_*.h5')[:args.max_files]:
             for pair in [1, 2, 3]:
                 try:
-                    D += [pc.data().from_h5(file, group=f'pt{pair}/{group}')]
+                    D += [ATL11xo.data().from_h5(file, group=f'pt{pair}/{group}')]
                 except Exception:
                     pass
         # D is all the data from the input group
