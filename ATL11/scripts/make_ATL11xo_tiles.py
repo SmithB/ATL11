@@ -220,7 +220,7 @@ def write_data(out_file, xyT, D_cache, args, group_attrs, group_descriptions, gr
             out_group = '/' if group=='ROOT' else group
             Dsub = D_cache[group][xyT]
             Dsub.to_h5(out_file, 
-#                       h5f_out=fh,
+                       h5f_out=fh,
                        group=out_group,
                        replace = False,
                        meta_dict = group_attrs[group])
