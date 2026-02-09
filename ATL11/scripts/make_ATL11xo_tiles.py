@@ -13,8 +13,9 @@ from importlib import resources
 import csv
 import h5py
 import uuid
-from ATL11 import ATL11xo
+import subprocess
 from ATL11.h5util import create_attribute
+from ATL11 import ATL11xo
 from ATL11.version import xosoftwareVersion, xosoftwareDate, xosoftwareTitle, xoidentifier, xoseries_version
 
 def make_queue(args):
@@ -217,8 +218,9 @@ def write_data(out_file, xyT, D_cache, args, group_attrs, group_descriptions, gr
         del fh['orbit_info']
         for group in ['ROOT','datum_track','crossing_track']:
             out_group = '/' if group=='ROOT' else group
-            Dsub=D_cache[group][xyT]
-            Dsub.to_h5(out_file, h5f_out=fh,
+            Dsub = D_cache[group][xyT]
+            Dsub.to_h5(out_file, 
+                       h5f_out=fh,
                        group=out_group,
                        replace = False,
                        meta_dict = group_attrs[group])
@@ -244,6 +246,41 @@ def write_data(out_file, xyT, D_cache, args, group_attrs, group_descriptions, gr
 
         make_dimensions(fh, group_dimensions)
 
+def post_process(xover_output_dir):
+    project_bin="/discover/nobackup/bjelley/bin"
+    atlas_meta = project_bin+"/atlas_meta"
+    atl11xo_qa_util = project_bin+"/atl11xo_qa_util"
+
+    if not os.path.isdir(xover_output_dir):
+        print('ERROR: xover_output_dir does not exist')
+        exit(1)
+
+
+    ATL11xo_glob=xover_output_dir+'/cycle_??/ATL11xo_*_??.h5'
+
+    ATL11xo_list = []
+    ATL11xo_list = glob.glob(ATL11xo_glob)
+
+# Read controlfile template
+    with open(project_bin+"/ATL11xo_AX_EXXXX_NXXXX_cXX_0XX_XX.ctl", "r") as ctltemplate:
+        ctllines = ctltemplate.readlines()
+
+    for file in ATL11xo_list:
+        control = file.replace('.h5', '.ctl')
+        with open(control, "w") as ctlfile:
+            for line in ctllines:
+                ctlfile.write(re.sub(r'_atl11file_', file, line))
+# Run atlas_meta
+        try:
+            result = subprocess.run([atlas_meta, control], capture_output=True, text= True)
+        except subprocess.CalledProcessError as e:
+            print(f"{atlas_meta} failed with error: {e}")
+# Run qa utility
+        try:
+            result = subprocess.run([atl11xo_qa_util, control], capture_output=True, text= True)
+        except subprocess.CalledProcessError as e:
+            print(f"{atl11xo_qa_util} failed with error: {e}")
+
 def main():
     parser=argparse.ArgumentParser(description='Generate a set of ATL11xo tiles from a directory of ATL11_atxo along-track crossover files')
     parser.add_argument('--top_dir', type=str, required=True, help='top directory containing ATL11_atxo files')
@@ -257,6 +294,7 @@ def main():
     parser.add_argument('--region', type=str, required=True, help='region for output, AA=Antarctic, AR=Arctic')
     parser.add_argument('--tile_spacing', type=float, default=200000, help='tile spacing,  m')
     parser.add_argument('--max_files', type=int, default=-1, help='if specified, limit number of ATL11 files to this, default is -1 (all_files)')
+    parser.add_argument('--post_process', type=bool, default=False, help='if true, run atlas_meta and QA utility')
     args=parser.parse_args()
 
     if args.dest_dir is None:
@@ -345,6 +383,10 @@ def main():
     for xyT in D_cache['ROOT'].keys():
         out_file = tS.tile_filename(xyT)
         write_data(out_file, xyT, D_cache, args, group_attrs, group_descriptions, group_dimensions)
+
+    # Run post processing steps
+    if args.post_process:
+        post_process(args.dest_dir)
 
 if __name__=="__main__":
     main()
