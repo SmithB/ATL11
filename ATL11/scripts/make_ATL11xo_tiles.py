@@ -12,6 +12,8 @@ from datetime import datetime, timedelta, timezone
 from importlib import resources
 import csv
 import h5py
+import pyproj
+import shapely.geometry
 import uuid
 import subprocess
 from ATL11.h5util import create_attribute
@@ -246,6 +248,71 @@ def write_data(out_file, xyT, D_cache, args, group_attrs, group_descriptions, gr
 
         make_dimensions(fh, group_dimensions)
 
+def poly_buffered_linestring(outfile):
+    lonlat_11=[]
+    with h5py.File(outfile,'r') as h5f:
+        try:
+            lonlat_11 += [np.c_[h5f['/longitude'], h5f['/latitude']]]
+        except Exception as e:
+            print(f"write_METADATA.py: problem reading latitude/longitude data from {outfile}")
+            print(e)
+    if np.sum(lonlat_11[0][:,1])/len(lonlat_11[0]) >= 0.0:
+      polarEPSG=3413
+    else:
+      polarEPSG=3031
+
+    xformer_ll2pol=pyproj.Transformer.from_crs(4326, polarEPSG)
+    xformer_pol2ll=pyproj.Transformer.from_crs(polarEPSG, 4326)
+    xy_11=[]
+    for ll in lonlat_11:
+        xy_11 += [np.c_[xformer_ll2pol.transform(ll[:,1], ll[:,0])]]
+    lines=[]
+    for xx in xy_11:
+        lines += [shapely.geometry.LineString(xx)]
+    line_simp=[]
+    for line in lines:
+        line_simp += [line.simplify(tolerance=100)]
+    all_lines=shapely.geometry.MultiLineString(line_simp)
+    common_buffer=all_lines.buffer(3000, 4)
+    common_buffer=common_buffer.simplify(tolerance=500)
+    if (common_buffer.geom_type == 'MultiPolygon'):
+      for i,g in enumerate(common_buffer.geoms):
+        xpol, ypol = np.array(g.exterior.coords.xy)
+    else:
+      xpol, ypol = np.array(common_buffer.exterior.coords.xy)
+    y1, x1 = xformer_pol2ll.transform(xpol, ypol)
+
+    with h5py.File(outfile,'r+') as h5f:
+      h5f.create_group('orbit_info'.encode('ASCII','replace'))
+      if '/orbit_info/bounding_polygon_dim1' in h5f:
+        del h5f['/orbit_info/bounding_polygon_dim1']
+        del h5f['/orbit_info/bounding_polygon_lon1']
+        del h5f['/orbit_info/bounding_polygon_lat1']
+      if '/orbit_info/bounding_polygon_dim2' in h5f:
+        del h5f['/orbit_info/bounding_polygon_dim2']
+        del h5f['/orbit_info/bounding_polygon_lon2']
+        del h5f['/orbit_info/bounding_polygon_lat2']
+
+      h5f.create_dataset('/orbit_info/bounding_polygon_dim1',data=np.arange(1,np.size(x1)+1),chunks=True,compression=6,dtype='int32')
+      create_attribute(h5f['orbit_info/bounding_polygon_dim1'].id, 'description', [], 'Polygon extent vertex count')
+      create_attribute(h5f['orbit_info/bounding_polygon_dim1'].id, 'units', [], '1')
+      create_attribute(h5f['orbit_info/bounding_polygon_dim1'].id, 'long_name', [], 'Polygon vertex count')
+      create_attribute(h5f['orbit_info/bounding_polygon_dim1'].id, 'source', [], 'model')
+      dset = h5f.create_dataset('/orbit_info/bounding_polygon_lon1',data=x1,chunks=True,compression=6,dtype='float32')
+      dset.dims[0].attach_scale(h5f['orbit_info']['bounding_polygon_dim1'])
+      create_attribute(h5f['orbit_info/bounding_polygon_lon1'].id, 'description', [], 'Polygon extent vertex longitude')
+      create_attribute(h5f['orbit_info/bounding_polygon_lon1'].id, 'units', [], 'degrees East')
+      create_attribute(h5f['orbit_info/bounding_polygon_lon1'].id, 'long_name', [], 'Polygon vertex longitude')
+      create_attribute(h5f['orbit_info/bounding_polygon_lon1'].id, 'source', [], 'model')
+      create_attribute(h5f['orbit_info/bounding_polygon_lon1'].id, 'coordinates', [], 'bounding_polygon_dim1')
+      dset = h5f.create_dataset('/orbit_info/bounding_polygon_lat1',data=y1,chunks=True,compression=6,dtype='float32')
+      dset.dims[0].attach_scale(h5f['orbit_info']['bounding_polygon_dim1'])
+      create_attribute(h5f['orbit_info/bounding_polygon_lat1'].id, 'description', [], 'Polygon extent vertex latitude')
+      create_attribute(h5f['orbit_info/bounding_polygon_lat1'].id, 'units', [], 'degrees North')
+      create_attribute(h5f['orbit_info/bounding_polygon_lat1'].id, 'long_name', [], 'Polygon vertex latitude')
+      create_attribute(h5f['orbit_info/bounding_polygon_lat1'].id, 'source', [], 'model')
+      create_attribute(h5f['orbit_info/bounding_polygon_lat1'].id, 'coordinates', [], 'bounding_polygon_dim1')
+
 def post_process(xover_output_dir):
     project_bin="/discover/nobackup/bjelley/bin"
     atlas_meta = project_bin+"/atlas_meta"
@@ -383,6 +450,7 @@ def main():
     for xyT in D_cache['ROOT'].keys():
         out_file = tS.tile_filename(xyT)
         write_data(out_file, xyT, D_cache, args, group_attrs, group_descriptions, group_dimensions)
+        poly_buffered_linestring(out_file)
 
     # Run post processing steps
     if args.post_process:
