@@ -14,7 +14,7 @@ import pointCollection as pc
 import matplotlib.pyplot as plt
 
 from matplotlib.backends.backend_pdf import PdfPages
-
+from importlib import resources
 #from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
 #import cartopy.io.img_tiles as cimgt
 
@@ -24,7 +24,6 @@ import re
 
 def ATL11_browse_plots(ATL11xo_file,
                        args=None,
-                       mosaic=None,
                        out_path=None,
                        pdf=False,
                        nolog=False):
@@ -41,7 +40,7 @@ def ATL11_browse_plots(ATL11xo_file,
     Dd = pc.data().from_h5(args.ATL11xo_file, group='datum_track',fields=['h_corr','delta_time'])
 
 
-    tile_re = re.compile('ATL11xo_(..)_E(.*)_N(.*)_c(\d\d)_(\d\d\d)_(\d\d).h5')
+    tile_re = re.compile(r'ATL11xo_(..)_E(.*)_N(.*)_c(\d\d)_(\d\d\d)_(\d\d).h5')
     region, x0, y0, cycle, release, version = \
         tile_re.search(os.path.basename(args.ATL11xo_file)).groups()
 
@@ -49,7 +48,7 @@ def ATL11_browse_plots(ATL11xo_file,
     y0 = int(y0)*1000
     bounds=[x0+np.array([-args.tile_width/2, args.tile_width/2]), y0+np.array([-args.tile_width/2, args.tile_width/2])]
 
-    DEM = pc.grid.data().from_geotif(mosaic, bounds=bounds)
+    DEM = pc.grid.data().from_geotif(args.mosaic, bounds=bounds)
     DEM.calc_gradient()
 
     # make plots,
@@ -99,44 +98,45 @@ def ATL11_browse_plots(ATL11xo_file,
     plt.figtext(0.1,0.01,f'Figure 1. Crossing-track heights from cycle {cycle} (1st panel). Crossing-track height difference from {DEM_name} (2nd panel). Number of valid crossing-track heights per square kilometer (3rd panel). All overlaid on gradient of DEM. Coordinates are in {coordinate_description}',wrap=True)
     ax1[0].set_ylabel('y [km]', fontdict={'fontsize':10})
     ax1[0].set_title('Crossing-track height', fontdict={'fontsize':10});
-    ax1[1].set_title('Height difference from DEM', fontdict={'fontsize':10});
+    ax1[1].set_title('Height difference\nfrom DEM', fontdict={'fontsize':10});
     ax1[2].set_title('Point density', fontdict={'fontsize':10});
     fig1.suptitle('{}'.format(os.path.basename(args.ATL11xo_file)))
     plt.subplots_adjust(bottom=0.23, top=0.9)
     fig1.savefig('{0}/{1}_Figure1_h_corr_NumValids_dHdtOverDEM.png'.format(out_path,ATL11xo_file_str),format='png', bbox_inches='tight')
     fig1.savefig('{0}/{1}_BRW_default1.png'.format(out_path,ATL11xo_file_str),format='png')
 
-    fig2,ax2 = plt.subplots(1, 3, sharey=True)
+    fig2,ax2 = plt.subplots(1, 3, sharey=True, figsize=[8, 6],
+                            gridspec_kw = {'bottom':0.5,'top':0.8,'left':0.1,'right':0.9})
     bins = np.arange(-0.1, 3.1, 0.2)
     xl=[-0.2, 1.2]
     plt.sca(ax2[0])
-    plt.hist((D0.fit_quality==0).astype(float), bins)
-    ax2[0].set_xticks([0, 1, 2, 3])
+    plt.hist(D0.fit_quality.astype(float), bins)
+    ax2[0].set_xticks([0, 1, 2, 3],
+                      ['valid','poly coeff \n $\sigma$ > 10','|slope| > 0.2', 'both'],
+                      rotation='vertical')
     ax2[0].set_xlim([-0.2, 3.2])
-    ax2[0].set_xticklabels(['valid','poly coeff error > 10','|slope| > 0.2', 'both'])
     ax2[0].set_title('reference surface fit')
 
-
+    bins=np.arange(-0.1, 1.1, 0.2)
     plt.sca(ax2[1])
     plt.hist(np.isnan(Dd.h_corr).astype(float), bins)
     plt.gca().set_xticks([0, 1])
-    ax2[0].set_xlim(xl)
+    ax2[1].set_xlim(xl)
     plt.gca().set_xticklabels(['valid','invalid'])
     plt.gca().set_title(f'datum-track height\ncycle {cycle}')
-
+    plt.gca().set_xticks([0, 1], ['valid','invalid'] , rotation='vertical')
 
     plt.sca(ax2[2])
     plt.hist(Dx.atl06_quality_summary.astype(float), bins)
-    plt.gca().set_xticks([0, 1])
-    ax2[0].set_xlim(xl)
-    plt.gca().set_xticklabels(['valid','potential problems'])
+    ax2[2].set_xlim(xl)
+    plt.gca().set_xticks([0, 1], ['valid','potential\nproblems'], rotation='vertical')
     plt.gca().set_title(f'crossing-track height\ncycle {cycle}')
 
     ax2[0].set_ylabel('count')
 
     fig2.suptitle('{}'.format(os.path.basename(ATL11xo_file)))
     plt.figtext(0.1,0.01,'Figure 2. Histograms reference surface fit quality (left panel), valid datum-track heights (middle panel) and valid crossing-track heights (right panel)',wrap=True)
-    plt.subplots_adjust(bottom=0.15)
+    plt.subplots_adjust(bottom=0.2, top=0.9)
     fig2.savefig('{0}/{1}_Figure2_flags_hist.png'.format(out_path,ATL11xo_file_str),format='png')
 
     if pdf:    #save all to one .pdf file
@@ -149,7 +149,11 @@ def ATL11_browse_plots(ATL11xo_file,
     ATL11xo_file_brw='{}/{}_BRW.h5'.format(out_path,ATL11xo_file_str)
     if os.path.isfile(ATL11xo_file_brw):
         os.remove(ATL11xo_file_brw)
-    shutil.copyfile('BRW_template.h5',ATL11xo_file_brw)
+    brw_template = os.path.join( str(resources.files('ATL11')),
+                                "package_data",
+                                "BRW_template.h5")
+    shutil.copyfile(brw_template,ATL11xo_file_brw)
+
     with h5py.File(ATL11xo_file_brw,'r+') as hf:
         for ii, name in enumerate(sorted(glob.glob('{0}/{1}_BRW_def*.png'.format(out_path,ATL11xo_file_str)))):
             hf.require_group('/default')
@@ -188,13 +192,13 @@ def main():
     import argparse
     parser=argparse.ArgumentParser()
     parser.add_argument('ATL11xo_file', type=str)
-    parser.add_argument('--tile_W', type=float, default=200e3, help='tile width, defaults to 200 km ')
+    parser.add_argument('--tile_width', type=float, default=200e3, help='tile width, defaults to 200 km ')
     parser.add_argument('--mosaic', '-m', type=str)
     parser.add_argument('--out_path', '-o', type=str, help='default is ATL11xo_file path')
     parser.add_argument('--pdf', action='store_true', default=False, help='write images to .pdf file')
     parser.add_argument('--nolog', action='store_true', default=False, help='no writing errors to .log file')
-    args=parser.parse_known_args()
-    ATL11_browse_plots(args.ATL11xo_file, mosaic=args.mosaic, out_path=args.out_path, pdf=args.pdf)
+    args=parser.parse_known_args()[0]
+    ATL11_browse_plots(args.ATL11xo_file, args=args, out_path=args.out_path, pdf=args.pdf)
 
 if __name__=="__main__":
     main()
