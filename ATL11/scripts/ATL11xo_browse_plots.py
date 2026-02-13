@@ -138,6 +138,7 @@ def ATL11_browse_plots(ATL11xo_file,
     plt.figtext(0.1,0.01,'Figure 2. Histograms reference surface fit quality (left panel), valid datum-track heights (middle panel) and valid crossing-track heights (right panel)',wrap=True)
     plt.subplots_adjust(bottom=0.2, top=0.9)
     fig2.savefig('{0}/{1}_Figure2_flags_hist.png'.format(out_path,ATL11xo_file_str),format='png')
+    fig2.savefig('{0}/{1}_BRW_default2.png'.format(out_path,ATL11xo_file_str),format='png')
 
     if pdf:    #save all to one .pdf file
         figs = list(map(plt.figure, plt.get_fignums()))
