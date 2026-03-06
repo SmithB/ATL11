@@ -42,6 +42,7 @@ def write_meta_fields(D, h5f, ref_cycles, cycle):
     h5f['METADATA/Extent'].attrs['southBoundLatitude'] = h5f['/'].attrs['geospatial_lat_min']
     create_attribute(h5f['/'].id, 'identifier_file_uuid', [], str(uuid.uuid4()))
     create_attribute(h5f['/'].id, 'date_created', [], str(datetime.now().date())+'T'+str(datetime.now().time())+'Z')
+    create_attribute(h5f['/'].id, 'date_modified', [], str(datetime.now().date())+'T'+str(datetime.now().time())+'Z')
     create_attribute(h5f['/'].id, 'history', [], str(datetime.now().date())+'T'+str(datetime.now().time())+'Z')
     create_attribute(h5f['/'].id, 'hdfversion', [], str(h5py.version.hdf5_version))
     create_attribute(h5f.id, 'identifier_product_format_version', [], xosoftwareVersion())
