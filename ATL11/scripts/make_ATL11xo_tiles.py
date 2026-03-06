@@ -248,7 +248,7 @@ def write_data(out_file, xyT, D_cache, args, group_attrs, group_descriptions, gr
 
         make_dimensions(fh, group_dimensions)
 
-def poly_buffered_linestring(outfile):
+def make_tile_bounding_poly(outfile, tile_bounds_xy):
     lonlat_11=[]
     with h5py.File(outfile,'r') as h5f:
         try:
@@ -256,30 +256,15 @@ def poly_buffered_linestring(outfile):
         except Exception as e:
             print(f"write_METADATA.py: problem reading latitude/longitude data from {outfile}")
             print(e)
-    if np.sum(lonlat_11[0][:,1])/len(lonlat_11[0]) >= 0.0:
-      polarEPSG=3413
-    else:
-      polarEPSG=3031
 
-    xformer_ll2pol=pyproj.Transformer.from_crs(4326, polarEPSG)
-    xformer_pol2ll=pyproj.Transformer.from_crs(polarEPSG, 4326)
-    xy_11=[]
-    for ll in lonlat_11:
-        xy_11 += [np.c_[xformer_ll2pol.transform(ll[:,1], ll[:,0])]]
-    lines=[]
-    for xx in xy_11:
-        lines += [shapely.geometry.LineString(xx)]
-    line_simp=[]
-    for line in lines:
-        line_simp += [line.simplify(tolerance=100)]
-    all_lines=shapely.geometry.MultiLineString(line_simp)
-    common_buffer=all_lines.buffer(3000, 4)
-    common_buffer=common_buffer.simplify(tolerance=500)
-    if (common_buffer.geom_type == 'MultiPolygon'):
-      for i,g in enumerate(common_buffer.geoms):
-        xpol, ypol = np.array(g.exterior.coords.xy)
+    if '_AA_' in os.path.basename(outfile):
+        polarEPSG=3031
     else:
-      xpol, ypol = np.array(common_buffer.exterior.coords.xy)
+        polarEPSG=3413
+
+    xformer_pol2ll=pyproj.Transformer.from_crs(polarEPSG, 4326)
+    xpol = np.array(tile_bounds_xy[0])[[0, 1, 1, 0, 0]]
+    ypol = np.array(tile_bounds_xy[1])[[1, 1, 0, 0, 1]]
     y1, x1 = xformer_pol2ll.transform(xpol, ypol)
 
     with h5py.File(outfile,'r+') as h5f:
@@ -361,6 +346,7 @@ def main():
     parser.add_argument('--region', type=str, required=True, help='region for output, AA=Antarctic, AR=Arctic')
     parser.add_argument('--tile_spacing', type=float, default=200000, help='tile spacing,  m')
     parser.add_argument('--max_files', type=int, default=-1, help='if specified, limit number of ATL11 files to this, default is -1 (all_files)')
+    parser.add_argument('--min_points', type=int, default=2, help='if fewer than this number of points are present, the tile will be skipped')
     parser.add_argument('--post_process', type=bool, default=False, help='if true, run atlas_meta and QA utility')
     args=parser.parse_args()
 
@@ -416,6 +402,9 @@ def main():
             bin_dict = tS.tile_xy(data=Dxy, return_dict=True)
         # loop over the spatial index:
         for xyT, ii in bin_dict.items():
+            # skip any tile that has too few points
+            if len(ii) < args.min_points:
+                continue
             for this_group in D_cache.keys():
                 if xyT not in D_cache[this_group]:
                     D_cache[this_group][xyT]={}
@@ -450,7 +439,8 @@ def main():
     for xyT in D_cache['ROOT'].keys():
         out_file = tS.tile_filename(xyT)
         write_data(out_file, xyT, D_cache, args, group_attrs, group_descriptions, group_dimensions)
-        poly_buffered_linestring(out_file)
+        xy_bounds = [ xyTi + np.array([-args.tile_spacing/2, args.tile_spacing/2]) for xyTi in xyT ]
+        make_tile_bounding_poly(out_file, xy_bounds)
 
     # Run post processing steps
     if args.post_process:
