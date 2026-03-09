@@ -18,12 +18,14 @@ import uuid
 import subprocess
 from ATL11.h5util import create_attribute
 from ATL11 import ATL11xo
+#from ATL11 import ATL11xo_browse_plots
+#import ATL11.ATL11xo_browse_plots
 from ATL11.version import xosoftwareVersion, xosoftwareDate, xosoftwareTitle, xoidentifier, xoseries_version
 
 def make_queue(args):
 
     for cycle in range(1, args.cycle+1):
-        print(f'make_ATL11xo_tiles.py --top_dir {args.top_dir} --dest_dir {args.dest_dir} --release {args.release} --version {args.version} --cycle {cycle} --region {args.region} --ref_cycles {args.ref_cycles[0]} {args.ref_cycles[1]}')
+        print(f'make_ATL11xo_tiles.py --top_dir {args.top_dir} --dest_dir {args.dest_dir} --release {args.release} --version {args.version} --cycle {cycle} --region {args.region} --ref_cycles {args.ref_cycles[0]} {args.ref_cycles[1]} --post_process {args.post_process}')
 
 def write_meta_fields(D, h5f, ref_cycles, cycle):
     ''' Write the metadata fields to an hdf5 file handle '''
@@ -299,26 +301,22 @@ def make_tile_bounding_poly(outfile, tile_bounds_xy):
       create_attribute(h5f['orbit_info/bounding_polygon_lat1'].id, 'source', [], 'model')
       create_attribute(h5f['orbit_info/bounding_polygon_lat1'].id, 'coordinates', [], 'bounding_polygon_dim1')
 
-def post_process(xover_output_dir):
-    project_bin="/discover/nobackup/bjelley/bin"
+def post_process(out_files, project_bin, region):
     atlas_meta = project_bin+"/atlas_meta"
     atl11xo_qa_util = project_bin+"/atl11xo_qa_util"
 
-    if not os.path.isdir(xover_output_dir):
-        print('ERROR: xover_output_dir does not exist')
-        exit(1)
-
-
-    ATL11xo_glob=xover_output_dir+'/cycle_??/ATL11xo_*_??.h5'
-
-    ATL11xo_list = []
-    ATL11xo_list = glob.glob(ATL11xo_glob)
+    if region=='AA':
+        mosaic_tif = project_bin+'/mosaic_500m_dem_filled.tif'
+        hemisph = -1
+    else:
+        mosaic_tif = project_bin+'/arcticdem_mosaic_500m_v3.0.tif'
+        hemisph = 1
 
 # Read controlfile template
     with open(project_bin+"/ATL11xo_AX_EXXXX_NXXXX_cXX_0XX_XX.ctl", "r") as ctltemplate:
         ctllines = ctltemplate.readlines()
 
-    for file in ATL11xo_list:
+    for file in out_files:
         control = file.replace('.h5', '.ctl')
         with open(control, "w") as ctlfile:
             for line in ctllines:
@@ -333,6 +331,12 @@ def post_process(xover_output_dir):
             result = subprocess.run([atl11xo_qa_util, control], capture_output=True, text= True)
         except subprocess.CalledProcessError as e:
             print(f"{atl11xo_qa_util} failed with error: {e}")
+
+# Run browse script
+        try:
+            result = subprocess.run(['ATL11xo_browse_plots.py', file, mosaic_tif, f'-H={hemisph}'], capture_output=True, text= True)
+        except subprocess.CalledProcessError as e:
+            print(f"ATL11xo_browse_plots.py failed with error: {e}")
 
 def main():
     parser=argparse.ArgumentParser(description='Generate a set of ATL11xo tiles from a directory of ATL11_atxo along-track crossover files')
@@ -349,6 +353,7 @@ def main():
     parser.add_argument('--max_files', type=int, default=-1, help='if specified, limit number of ATL11 files to this, default is -1 (all_files)')
     parser.add_argument('--min_points', type=int, default=2, help='if fewer than this number of points are present, the tile will be skipped')
     parser.add_argument('--post_process', type=bool, default=False, help='if true, run atlas_meta and QA utility')
+    parser.add_argument('--bin_dir', type=str, default='/discover/nobackup/bjelley/bin', help='full path source of binaries and dem mosaics')
     args=parser.parse_args()
 
     if args.dest_dir is None:
@@ -437,15 +442,17 @@ def main():
                         Dsub.fields.remove(field)
                 D_cache[group][xyT] = Dsub
     # now loop over output files:
+    out_files = []
     for xyT in D_cache['ROOT'].keys():
         out_file = tS.tile_filename(xyT)
+        out_files.append(out_file)
         write_data(out_file, xyT, D_cache, args, group_attrs, group_descriptions, group_dimensions)
         xy_bounds = [ xyTi + np.array([-args.tile_spacing/2, args.tile_spacing/2]) for xyTi in xyT ]
         make_tile_bounding_poly(out_file, xy_bounds)
 
     # Run post processing steps
     if args.post_process:
-        post_process(args.dest_dir)
+        post_process(out_files, args.bin_dir, args.region)
 
 if __name__=="__main__":
     main()
