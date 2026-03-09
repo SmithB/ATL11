@@ -22,8 +22,10 @@ import imageio
 import datetime as dt
 import re
 
-def ATL11_browse_plots(ATL11xo_file,
+def ATL11xo_browse_plots(ATL11xo_file,
+                       mosaic,
                        args=None,
+                       region='AA',
                        out_path=None,
                        pdf=False,
                        nolog=False):
@@ -193,13 +195,13 @@ def main():
     import argparse
     parser=argparse.ArgumentParser()
     parser.add_argument('ATL11xo_file', type=str)
+    parser.add_argument('mosaic', type=str)
     parser.add_argument('--tile_width', type=float, default=200e3, help='tile width, defaults to 200 km ')
-    parser.add_argument('--mosaic', '-m', type=str)
     parser.add_argument('--out_path', '-o', type=str, help='default is ATL11xo_file path')
     parser.add_argument('--pdf', action='store_true', default=False, help='write images to .pdf file')
     parser.add_argument('--nolog', action='store_true', default=False, help='no writing errors to .log file')
     args=parser.parse_known_args()[0]
-    ATL11_browse_plots(args.ATL11xo_file, args=args, out_path=args.out_path, pdf=args.pdf)
+    ATL11xo_browse_plots(args.ATL11xo_file, args.mosaic, args=args, out_path=args.out_path, pdf=args.pdf)
 
 if __name__=="__main__":
     main()
