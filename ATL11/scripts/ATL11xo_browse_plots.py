@@ -58,7 +58,7 @@ def ATL11xo_browse_plots(ATL11xo_file,
     fig1, ax1 = plt.subplots(1,3,sharex=True,sharey=True) #, subplot_kw=dict(projection=projection))
 
     for ax in ax1:
-        if 'z_x' in DEM.fields:
+        if 'z_x' in DEM.fields and np.any(np.isfinite(DEM.z_x)):
             DEM.show(ax=ax, field='z_x', xy_scale=1/1000, cmap='gray', \
                      clim = np.percentile(DEM.z_x[~np.isnan(DEM.z_x)], [5,95]),
                      interpolation='nearest', aspect='equal')
