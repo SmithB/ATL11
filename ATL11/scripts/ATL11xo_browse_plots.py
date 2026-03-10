@@ -49,16 +49,17 @@ def ATL11_browse_plots(ATL11xo_file,
     bounds=[x0+np.array([-args.tile_width/2, args.tile_width/2]), y0+np.array([-args.tile_width/2, args.tile_width/2])]
 
     DEM = pc.grid.data().from_geotif(args.mosaic, bounds=bounds)
-    DEM.calc_gradient()
+    if 'z' in DEM.fields:
+        DEM.calc_gradient()
 
     # make plots,
     fig1, ax1 = plt.subplots(1,3,sharex=True,sharey=True) #, subplot_kw=dict(projection=projection))
 
     for ax in ax1:
-        DEM.show(ax=ax, field='z_x', xy_scale=1/1000, cmap='gray', \
-                 clim = np.percentile(DEM.z_x[~np.isnan(DEM.z_x)], [5,95]),
-                 interpolation='nearest', aspect='equal')
-
+        if 'z_x' in DEM.fields:
+            DEM.show(ax=ax, field='z_x', xy_scale=1/1000, cmap='gray', \
+                     clim = np.percentile(DEM.z_x[~np.isnan(DEM.z_x)], [5,95]),
+                     interpolation='nearest', aspect='equal')
 
     plt.sca(ax1[0])
     good = (D0.fit_quality==0) & (Dx.atl06_quality_summary==0)
@@ -88,6 +89,7 @@ def ATL11_browse_plots(ATL11xo_file,
     for ax in ax1:
         ax.set_xlim(bounds[0]/1000)
         ax.set_ylim(bounds[1]/1000)
+        ax.set_aspect(1)
 
     if region=='AA':
         coordinate_description='south-polar Antarctic stereographic projection (EPSG=3031)'
@@ -95,7 +97,7 @@ def ATL11_browse_plots(ATL11xo_file,
     elif region=='AR':
         coordinate_description='north-polar Arctic Sea Ice stereographic projection (EPSG=3413)'
         DEM_name= 'ArcticDEM'
-    plt.figtext(0.1,0.01,f'Figure 1. Crossing-track heights from cycle {cycle} (1st panel). Crossing-track height difference from {DEM_name} (2nd panel). Number of valid crossing-track heights per square kilometer (3rd panel). All overlaid on gradient of DEM. Coordinates are in {coordinate_description}',wrap=True)
+    plt.figtext(0.1,0.01,f'Figure 1. Crossing-track heights from cycle {cycle} (1st panel). Crossing-track height difference from ICESat-2 DEM (2nd panel). Number of valid crossing-track heights per square kilometer (3rd panel). All overlaid on gradient of DEM. Coordinates are in {coordinate_description}',wrap=True)
     ax1[0].set_ylabel('y [km]', fontdict={'fontsize':10})
     ax1[0].set_title('Crossing-track height', fontdict={'fontsize':10});
     ax1[1].set_title('Height difference\nfrom DEM', fontdict={'fontsize':10});
@@ -112,7 +114,7 @@ def ATL11_browse_plots(ATL11xo_file,
     plt.sca(ax2[0])
     plt.hist(D0.fit_quality.astype(float), bins)
     ax2[0].set_xticks([0, 1, 2, 3],
-                      ['valid','poly coeff \n $\sigma$ > 10','|slope| > 0.2', 'both'],
+                      ['valid',r'poly coeff \n $\sigma$ > 10','|slope| > 0.2', 'both'],
                       rotation='vertical')
     ax2[0].set_xlim([-0.2, 3.2])
     ax2[0].set_title('reference surface fit')
