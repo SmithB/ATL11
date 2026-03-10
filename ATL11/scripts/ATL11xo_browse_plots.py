@@ -79,7 +79,13 @@ def ATL11xo_browse_plots(ATL11xo_file,
 
     def pt_count(D, ii):
         return len(ii)
-    n_pts = pc.apply_bin_fn(D0[good], 1000, fn=pt_count, fields='N')
+    if np.any(good):
+        n_pts = pc.apply_bin_fn(D0[good], 1000, fn=pt_count, fields='N')
+    else:
+                n_pts = pc.data().from_dict(
+                    {'x':np.array([np.mean(D0.x)]),
+                     'y':np.array([np.mean(D0.y)]),
+                    'N':np.array([0])})
 
     plt.sca(ax1[2])
     ind=np.argsort(n_pts.N)
