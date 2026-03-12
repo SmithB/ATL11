@@ -19,6 +19,7 @@ from importlib import resources
 #import cartopy.io.img_tiles as cimgt
 
 import imageio
+from io import BytesIO
 import datetime as dt
 import re
 
@@ -55,6 +56,7 @@ def ATL11xo_browse_plots(ATL11xo_file,
         DEM.calc_gradient()
 
     # make plots,
+    png_buffers = []
     fig1, ax1 = plt.subplots(1,3,sharex=True,sharey=True) #, subplot_kw=dict(projection=projection))
 
     for ax in ax1:
@@ -112,8 +114,12 @@ def ATL11xo_browse_plots(ATL11xo_file,
     ax1[2].set_title('Point density', fontdict={'fontsize':10});
     fig1.suptitle('{}'.format(os.path.basename(args.ATL11xo_file)))
     plt.subplots_adjust(bottom=0.23, top=0.9)
-    fig1.savefig('{0}/{1}_Figure1_h_corr_NumValids_dHdtOverDEM.png'.format(out_path,ATL11xo_file_str),format='png', bbox_inches='tight')
-    fig1.savefig('{0}/{1}_BRW_default1.png'.format(out_path,ATL11xo_file_str),format='png')
+    buffer = BytesIO()
+    fig1.savefig(buffer, format='png')
+    buffer.seek(0)
+    png_buffers.append(buffer.getvalue())
+#    fig1.savefig('{0}/{1}_Figure1_h_corr_NumValids_dHdtOverDEM.png'.format(out_path,ATL11xo_file_str),format='png', bbox_inches='tight')
+#    fig1.savefig('{0}/{1}_BRW_default1.png'.format(out_path,ATL11xo_file_str),format='png')
 
     fig2,ax2 = plt.subplots(1, 3, sharey=True, figsize=[8, 6],
                             gridspec_kw = {'bottom':0.5,'top':0.8,'left':0.1,'right':0.9})
@@ -147,8 +153,12 @@ def ATL11xo_browse_plots(ATL11xo_file,
     fig2.suptitle('{}'.format(os.path.basename(ATL11xo_file)))
     plt.figtext(0.1,0.01,'Figure 2. Histograms reference surface fit quality (left panel), valid datum-track heights (middle panel) and valid crossing-track heights (right panel)',wrap=True)
     plt.subplots_adjust(bottom=0.2, top=0.9)
-    fig2.savefig('{0}/{1}_Figure2_flags_hist.png'.format(out_path,ATL11xo_file_str),format='png')
-    fig2.savefig('{0}/{1}_BRW_default2.png'.format(out_path,ATL11xo_file_str),format='png')
+    buffer = BytesIO()
+    fig2.savefig(buffer, format='png')
+    buffer.seek(0)
+    png_buffers.append(buffer.getvalue())
+#    fig2.savefig('{0}/{1}_Figure2_flags_hist.png'.format(out_path,ATL11xo_file_str),format='png')
+#    fig2.savefig('{0}/{1}_BRW_default2.png'.format(out_path,ATL11xo_file_str),format='png')
 
     if pdf:    #save all to one .pdf file
         figs = list(map(plt.figure, plt.get_fignums()))
@@ -166,37 +176,44 @@ def ATL11xo_browse_plots(ATL11xo_file,
     shutil.copyfile(brw_template,ATL11xo_file_brw)
 
     with h5py.File(ATL11xo_file_brw,'r+') as hf:
-        for ii, name in enumerate(sorted(glob.glob('{0}/{1}_BRW_def*.png'.format(out_path,ATL11xo_file_str)))):
+#        for ii, name in enumerate(sorted(glob.glob('{0}/{1}_BRW_def*.png'.format(out_path,ATL11xo_file_str)))):
+        for ii in range(len(png_buffers)):
             hf.require_group('/default')
-            img = imageio.imread(name, pilmode='RGB')
+#            img = imageio.imread(name, pilmode='RGB')
+            print('ii: ', ii)
+#            img = png_buffers[ii]
+            img = imageio.imread(png_buffers[ii], pilmode='RGB')
 
-            namestr = os.path.splitext(name)[0]
-            namestr = os.path.basename(namestr).split('BRW_')[-1]
+#            namestr = os.path.splitext(name)[0]
+#            namestr = os.path.basename(namestr).split('BRW_')[-1]
+
+            namestr = 'default'+str(ii+1)
+            print('namestr: ', namestr)
             dset = hf.create_dataset('default/'+namestr, img.shape, data=img.data, \
                                      chunks=img.shape, compression='gzip',compression_opts=6)
             dset.attrs['CLASS'] = np.bytes_('IMAGE')
             dset.attrs['IMAGE_VERSION'] = np.bytes_('1.2')
             dset.attrs['IMAGE_SUBCLASS'] = np.bytes_('IMAGE_TRUECOLOR')
             dset.attrs['INTERLACE_MODE'] = np.bytes_('INTERLACE_PIXEL')
-        for ii, name in enumerate(sorted(glob.glob('{0}/{1}_Figure*.png'.format(out_path,ATL11xo_file_str)))):
-            if 'Figure1' not in name and 'Figure3' not in name:
-                img = imageio.imread(name, pilmode='RGB')
-
-                namestr = os.path.splitext(name)[0]
-                namestr = os.path.basename(namestr).split('Figure')[-1]
-                dset = hf.create_dataset(namestr[2:], img.shape, data=img.data, \
-                                         chunks=img.shape, compression='gzip',compression_opts=6)
-                dset.attrs['CLASS'] = np.bytes_('IMAGE')
-                dset.attrs['IMAGE_VERSION'] = np.bytes_('1.2')
-                dset.attrs['IMAGE_SUBCLASS'] = np.bytes_('IMAGE_TRUECOLOR')
-                dset.attrs['INTERLACE_MODE'] = np.bytes_('INTERLACE_PIXEL')
+#        for ii, name in enumerate(sorted(glob.glob('{0}/{1}_Figure*.png'.format(out_path,ATL11xo_file_str)))):
+#            if 'Figure1' not in name and 'Figure3' not in name:
+#                img = imageio.imread(name, pilmode='RGB')
+#
+#                namestr = os.path.splitext(name)[0]
+#                namestr = os.path.basename(namestr).split('Figure')[-1]
+#                dset = hf.create_dataset(namestr[2:], img.shape, data=img.data, \
+#                                         chunks=img.shape, compression='gzip',compression_opts=6)
+#                dset.attrs['CLASS'] = np.bytes_('IMAGE')
+#                dset.attrs['IMAGE_VERSION'] = np.bytes_('1.2')
+#                dset.attrs['IMAGE_SUBCLASS'] = np.bytes_('IMAGE_TRUECOLOR')
+#                dset.attrs['INTERLACE_MODE'] = np.bytes_('INTERLACE_PIXEL')
         del hf['ancillary_data']
         with h5py.File(ATL11xo_file,'r') as g:
             g.copy('ancillary_data',hf)
 
     # remove individual png files
-    for name in sorted(glob.glob('{0}/{1}_Figure*.png'.format(out_path,ATL11xo_file_str))):
-        if os.path.isfile(name): os.remove(name)
+#    for name in sorted(glob.glob('{0}/{1}_Figure*.png'.format(out_path,ATL11xo_file_str))):
+#        if os.path.isfile(name): os.remove(name)
     fhlog.close()
 
 def main():
