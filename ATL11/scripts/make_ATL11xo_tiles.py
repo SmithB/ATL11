@@ -18,8 +18,6 @@ import uuid
 import subprocess
 from ATL11.h5util import create_attribute
 from ATL11 import ATL11xo
-#from ATL11 import ATL11xo_browse_plots
-#import ATL11.ATL11xo_browse_plots
 from ATL11.version import xosoftwareVersion, xosoftwareDate, xosoftwareTitle, xoidentifier, xoseries_version
 
 def make_queue(args):
@@ -77,7 +75,7 @@ def write_meta_fields(D, h5f, ref_cycles, cycle):
     g2['start_rgt'][...] = np.array([np.nanmin(D.rgt).astype(int)])
     g2['end_rgt'][...] = np.array([np.nanmax(D.rgt).astype(int)])
     ctl = h5f['METADATA']['Lineage']['Control'].attrs['control'].decode()
-    g2['control'][...] = ctl.encode('ASCII','replace')
+#    g2['control'][...] = ctl.encode('ASCII','replace')
     g2['release'][...] = os.path.basename(h5f.filename).split('_')[-2].encode('ASCII','replace')
     g2['version'][...] = os.path.splitext(os.path.basename(h5f.filename))[0].split('_')[-1].encode('ASCII','replace')
 
@@ -301,7 +299,7 @@ def make_tile_bounding_poly(outfile, tile_bounds_xy):
       create_attribute(h5f['orbit_info/bounding_polygon_lat1'].id, 'source', [], 'model')
       create_attribute(h5f['orbit_info/bounding_polygon_lat1'].id, 'coordinates', [], 'bounding_polygon_dim1')
 
-def post_process(out_files, project_bin, region):
+def post_process(out_files, project_bin, region, verbose=False):
     atlas_meta = project_bin+"/atlas_meta"
     atl11xo_qa_util = project_bin+"/atl11xo_qa_util"
 
@@ -324,19 +322,40 @@ def post_process(out_files, project_bin, region):
 # Run atlas_meta
         try:
             result = subprocess.run([atlas_meta, control], capture_output=True, text= True)
+            if verbose:
+                print("Output:\n", result.stdout)
+                if len(result.stderr) != 0:
+                    print("Error:", result.stderr)
         except subprocess.CalledProcessError as e:
             print(f"{atlas_meta} failed with error: {e}")
+            print("Output:", result.stdout)
+            print("Error:", result.stderr)
 # Run qa utility
         try:
             result = subprocess.run([atl11xo_qa_util, control], capture_output=True, text= True)
+            if verbose:
+                print("Output:\n", result.stdout)
+                if len(result.stderr) != 0:
+                    print("Error:", result.stderr)
         except subprocess.CalledProcessError as e:
             print(f"{atl11xo_qa_util} failed with error: {e}")
+            print("Output:", result.stdout)
+            print("Error:", result.stderr)
 
 # Run browse script
-        try:
-            result = subprocess.run(['ATL11xo_browse_plots.py', file, mosaic_tif, f'-H={hemisph}'], capture_output=True, text= True)
-        except subprocess.CalledProcessError as e:
-            print(f"ATL11xo_browse_plots.py failed with error: {e}")
+#        try:
+#            result = subprocess.run(['ATL11xo_browse_plots.py', file, mosaic_tif, f'-H={hemisph}'], capture_output=True, text= True)
+#            if verbose:
+#                print("Output:\n", result.stdout)
+#                if len(result.stderr) != 0:
+#                    print("Error:", result.stderr)
+#        except subprocess.CalledProcessError as e:
+#            print(f"ATL11xo_browse_plots.py failed with error: {e}")
+#            print("Output:", result.stdout)
+#            print("Error:", result.stderr)
+
+    if verbose:
+        print("Completed post_process")
 
 def main():
     parser=argparse.ArgumentParser(description='Generate a set of ATL11xo tiles from a directory of ATL11_atxo along-track crossover files')
@@ -354,12 +373,15 @@ def main():
     parser.add_argument('--min_points', type=int, default=2, help='if fewer than this number of points are present, the tile will be skipped')
     parser.add_argument('--post_process', type=bool, default=False, help='if true, run atlas_meta and QA utility')
     parser.add_argument('--bin_dir', type=str, default='/discover/nobackup/bjelley/bin', help='full path source of binaries and dem mosaics')
+    parser.add_argument('--verbose','-v', action='store_true')
     args=parser.parse_args()
 
     if args.dest_dir is None:
         args.dest_dir = args.top_dir
 
     if args.queue:
+        if args.verbose:
+            print('Printing queue, only')
         make_queue(args)
         sys.exit(0)
 
@@ -390,6 +412,8 @@ def main():
     D_cache={'crossing_track':{},'datum_track':{},'ROOT':{}}
 
     for group in ['crossing_track', 'datum_track','ROOT']:
+        if args.verbose:
+            print('Reading input data for group: ', group)
         D=[]
         for file in glob.glob(args.top_dir+f'/cycle_{args.cycle:02d}/ATL11_atxo*_{args.cycle:02d}_*_*.h5')[:args.max_files]:
             for pair in [1, 2, 3]:
@@ -441,6 +465,8 @@ def main():
                         D_cache['ROOT'][xyT][field] = getattr(Dsub, field)
                         Dsub.fields.remove(field)
                 D_cache[group][xyT] = Dsub
+    if args.verbose:
+        print('completed reading/processing of input data')
     # now loop over output files:
     out_files = []
     for xyT in D_cache['ROOT'].keys():
@@ -450,9 +476,11 @@ def main():
         xy_bounds = [ xyTi + np.array([-args.tile_spacing/2, args.tile_spacing/2]) for xyTi in xyT ]
         make_tile_bounding_poly(out_file, xy_bounds)
 
+    if args.verbose:
+        print('completed writing of output')
     # Run post processing steps
     if args.post_process:
-        post_process(out_files, args.bin_dir, args.region)
+        post_process(out_files, args.bin_dir, args.region, verbose=args.verbose)
 
 if __name__=="__main__":
     main()
