@@ -479,7 +479,10 @@ def main():
     except FileExistsError:
         pass
 
-    tS = pc.tilingSchema(mapping_function_name='floor', tile_spacing=args.tile_spacing, EPSG=args.EPSG,
+    # 9/7/2026: Versions of pointCollection earlier than September 2026 silendly ignored the
+    # mapping_function_name argument and used "round" instead of "floor."  In the line below,
+    # the mapping_function_name is changed from "floor" to "round" to acknowledge this behavior.
+    tS = pc.tilingSchema(mapping_function_name='round', tile_spacing=args.tile_spacing, EPSG=args.EPSG,
                         format_str = f'ATL11XO_{args.region}_E%d_N%d_c{args.cycle:02d}_{args.release:03d}_{args.version:02d}')
     schema_file = os.path.join(tile_out_dir, f'{int(args.tile_spacing/1000)}km_tiling_{args.region}.json')
     if not os.path.isfile(schema_file):
