@@ -314,6 +314,9 @@ class data(object):
         # Optional input:
         #   parms_11: ATL11.defaults structure
 
+        # Set parameter for chunk size
+        along_track_output_chunk_size: int = 1000
+
         if cycle is None:
             cycles = self.cycles
         else:
@@ -392,7 +395,9 @@ class data(object):
         for field in ['ref_pt','cycle_number']:
             dimensions = field_attrs[field]['dimensions'].split(',')
             data = getattr(getattr(self,'ROOT'),field)
-            dset = g.create_dataset(field.encode('ASCII'),data=data,chunks=True,compression=6,dtype=field_attrs[field]['dtype']) #,fillvalue=fillvalue)
+            dset = g.create_dataset(field.encode('ASCII'),data=data,
+                                    chunks=(min(len(field),along_track_output_chunk_size)),
+                                    compression=6,dtype=field_attrs[field]['dtype']) #,fillvalue=fillvalue)
             dset.dims[0].label = field
 
             for attr in attr_names:
@@ -412,9 +417,16 @@ class data(object):
             data = np.nan_to_num(data,nan=field_attrs[field]['fill_val'])
             if field_attrs[field]['datatype'].startswith('int'):
                 data = data.astype('int')  # don't change to int before substituting nans with invalid.
-            dset = g.create_dataset(field.encode('ASCII'),
+            if data.ndim == 2:
+              dset = g.create_dataset(field.encode('ASCII'),
                                     data=data,fillvalue=field_attrs[field]['fill_val'],
-                                    chunks=True,
+                                    chunks=(min(data.shape[0],along_track_output_chunk_size),data.shape[1]),
+                                    compression=6,
+                                    dtype=field_attrs[field]['dtype'])
+            else:
+              dset = g.create_dataset(field.encode('ASCII'),
+                                    data=data,fillvalue=field_attrs[field]['fill_val'],
+                                    chunks=(min(data.shape[0],along_track_output_chunk_size)),
                                     compression=6,
                                     dtype=field_attrs[field]['dtype'])
             dset.dims[0].label = field
@@ -451,18 +463,26 @@ class data(object):
                 if 'crossing_track_data' in group:
                     this_ref_pt=getattr(getattr(self,group),'ref_pt')
                     if len(this_ref_pt) > 0:
-                        dset = grp.create_dataset('ref_pt'.encode('ASCII'),data=this_ref_pt,chunks=True,compression=6,dtype=field_attrs['ref_pt']['datatype'])
+                        dset = grp.create_dataset('ref_pt'.encode('ASCII'),data=this_ref_pt,
+                                                  chunks=(min(this_ref_pt.shape[0],along_track_output_chunk_size)),
+                                                  compression=6,dtype=field_attrs['ref_pt']['datatype'])
                     else:
-                        dset = grp.create_dataset('ref_pt'.encode('ASCII'), shape=[0],chunks=True,compression=6,dtype=np.int32)
+                        dset = grp.create_dataset('ref_pt'.encode('ASCII'), shape=[0],
+                                                  chunks=(min(this_ref_pt.shape[0],along_track_output_chunk_size)),
+                                                  compression=6,dtype=np.int32)
                     dset.dims[0].label = 'ref_pt'.encode('ASCII')
                     for attr in attr_names:
                         if 'dimensions' not in attr and 'datatype' not in attr:
                             create_attribute(dset.id, attr, [], field_attrs['ref_pt'][attr])
 
                 if 'ref_surf' in group:
-                    dset = grp.create_dataset('poly_exponent_x'.encode('ASCII'),data=np.array([item[0] for item in params_11.poly_exponent_list]),chunks=True,compression=6,dtype=field_attrs['poly_exponent_x']['datatype'])
+                    dset = grp.create_dataset('poly_exponent_x'.encode('ASCII'),data=np.array([item[0] for item in params_11.poly_exponent_list]),
+                                              chunks=True,
+                                              compression=6,dtype=field_attrs['poly_exponent_x']['datatype'])
                     dset.dims[0].label = 'poly_exponent_x'.encode('ASCII')
-                    dset = grp.create_dataset('poly_exponent_y'.encode('ASCII'),data=np.array([item[1] for item in params_11.poly_exponent_list]),chunks=True,compression=6, dtype=field_attrs['poly_exponent_y']['datatype'])
+                    dset = grp.create_dataset('poly_exponent_y'.encode('ASCII'),data=np.array([item[1] for item in params_11.poly_exponent_list]),
+                                              chunks=True,
+                                              compression=6, dtype=field_attrs['poly_exponent_y']['datatype'])
                     dset.dims[0].label = 'poly_exponent_y'.encode('ASCII')
                     for field in ['poly_exponent_x', 'poly_exponent_y']:
                         dset=grp[field]
@@ -490,12 +510,18 @@ class data(object):
                         # change nans to proper invalid, depending on datatype
                         if field_attrs[field]['datatype'].startswith('int'):
                             data = data.astype('int')  # don't change to int before substituting nans with invalid.
-
-                        dset = grp.create_dataset(field.encode('ASCII'),data=data,
-                                                  fillvalue=field_attrs[field]['fill_val'],
-                                                  chunks=True,
-                                                  compression=6,
-                                                  dtype=field_attrs[field]['dtype'])
+                        if data.ndim == 2:
+                            dset = grp.create_dataset(field.encode('ASCII'),
+                                    data=data,fillvalue=field_attrs[field]['fill_val'],
+                                    chunks=(min(data.shape[0],along_track_output_chunk_size),data.shape[1]),
+                                    compression=6,
+                                    dtype=field_attrs[field]['dtype'])
+                        else:
+                            dset = grp.create_dataset(field.encode('ASCII'),
+                                    data=data,fillvalue=field_attrs[field]['fill_val'],
+                                    chunks=(min(data.shape[0],along_track_output_chunk_size)),
+                                    compression=6,
+                                    dtype=field_attrs[field]['dtype'])
                         for ii,dim in enumerate(dimensions):
                             dim=dim.strip()
                             if 'N_pts' in dim:
