@@ -412,7 +412,6 @@ class data(object):
 
         for field in [item for item in list_vars if (item != 'ref_pt') and (item != 'cycle_number')]:
             dimensions = field_attrs[field]['dimensions'].split(',')
-            print('field,dims', field, dimensions)
             data = getattr(getattr(self,'ROOT'),field)
             # change nans to proper invalid, depending on datatype
             data = np.nan_to_num(data,nan=field_attrs[field]['fill_val'])
