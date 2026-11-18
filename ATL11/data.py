@@ -962,6 +962,16 @@ def shift_lon(lon, lon0=0):
     lon[lon<-180] += 360
     return lon
 
+def biased_median(xx):
+    """
+    Return the median of a set of points (if odd) or the element after the median (if even)
+    """
+    if len(xx)==1:
+        return(xx[0])
+    else:
+        return xx[np.argsort(xx)[
+            int(np.floor(np.sum(np.isfinite(xx))/2))]]
+
 def regress_to(D, out_field_names, in_field_names, in_field_pt, DEBUG=None):
 
     """
@@ -979,7 +989,7 @@ def regress_to(D, out_field_names, in_field_names, in_field_pt, DEBUG=None):
     if 'longitude' in out_field_names:
         # if longitude is in the regression parameters, need to unwrqp it
         lon_col=out_field_names.index('longitude')
-        lon0=np.nanmedian(D_out[:,lon_col])
+        lon0=biased_median(D_out[:,lon_col])
         D_out[:, lon_col]=shift_lon(D_out[:, lon_col], lon0=-lon0)
     good_rows=np.all(~np.isnan( np.concatenate( (D_in,D_out), axis=1)), axis=1)
 
